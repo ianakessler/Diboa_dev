@@ -1,0 +1,236 @@
+### ============================================================
+### Diboa Cashback API — Testes REST Client (VS Code)
+### Extensão: REST Client (humao.rest-client)
+### ============================================================
+
+@baseUrl = http://localhost:3000/api/v1
+@contentType = application/json
+
+### CPFs de teste (use CPFs válidos do seu banco)
+@cpf_valido     = 33546635884
+@cpf_sem_pontos = 529.982.247-25
+@cpf_invalido   = 111.111.111-11
+@cpf_inexistente = 000.000.000-00
+
+
+# ==============================================================
+# 🏥  HEALTH CHECK
+# ==============================================================
+
+### [HEALTH] Servidor respondendo
+# @name health
+GET http://localhost:3000/health
+
+
+# ==============================================================
+# 👤  CLIENTES
+# ==============================================================
+
+### [CLIENTES] Listar todos os clientes
+# @name getAllClients
+GET {{baseUrl}}/clients
+Content-Type: {{contentType}}
+
+###
+
+### [CLIENTES] Buscar cliente por CPF válido (com formatação)
+# @name getClientFormatted
+GET {{baseUrl}}/clients/cpf/{{cpf_valido}}
+Content-Type: {{contentType}}
+
+###
+
+### [CLIENTES] Buscar cliente por CPF válido (somente dígitos)
+# @name getClientDigits
+GET {{baseUrl}}/clients/cpf/28302220833
+Content-Type: {{contentType}}
+
+###
+
+### [CLIENTES] Buscar cliente inexistente → espera 404
+# @name getClientNotFound
+GET {{baseUrl}}/clients/cpf/{{cpf_inexistente}}
+Content-Type: {{contentType}}
+
+###
+
+### [CLIENTES] CPF inválido (não passa validação) → espera 400
+# @name getClientInvalidCpf
+GET {{baseUrl}}/clients/cpf/{{cpf_invalido}}
+Content-Type: {{contentType}}
+
+###
+
+### [CLIENTES] CPF com letras → espera 400
+# @name getClientNonNumeric
+GET {{baseUrl}}/clients/cpf/abc.def.ghi-jk
+Content-Type: {{contentType}}
+
+
+# ==============================================================
+# 🎁  RESGATES
+# ==============================================================
+
+### [RESGATE] Resgate válido com CPF formatado
+# @name resgateValido
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": 100
+}
+
+###
+
+### [RESGATE] Resgate válido com CPF somente dígitos
+# @name resgateValidoDigits
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "28302220833",
+  "pontos": 10
+}
+
+###
+
+### [RESGATE] Saldo insuficiente → espera 422 INSUFFICIENT_BALANCE
+# @name resgateInsuficiente
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": 9999999
+}
+
+###
+
+### [RESGATE] Cliente não encontrado → espera 404 NOT_FOUND
+# @name resgateClienteInexistente
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_inexistente}}",
+  "pontos": 10
+}
+
+###
+
+### [RESGATE] CPF inválido → espera 400 BAD_REQUEST
+# @name resgateInvalidCpf
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_invalido}}",
+  "pontos": 10
+}
+
+###
+
+### [RESGATE] Pontos negativos → espera 400 BAD_REQUEST
+# @name resgateNegativo
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": -50
+}
+
+###
+
+### [RESGATE] Pontos zero → espera 400 BAD_REQUEST
+# @name resgateZero
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": 0
+}
+
+###
+
+### [RESGATE] Pontos como string → espera 400 BAD_REQUEST
+# @name resgateStringPontos
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": "cem"
+}
+
+###
+
+### [RESGATE] Pontos como decimal → espera 400 BAD_REQUEST (deve ser inteiro)
+# @name resgateDecimal
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}",
+  "pontos": 10.5
+}
+
+###
+
+### [RESGATE] Body vazio → espera 400 BAD_REQUEST
+# @name resgateBodyVazio
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{}
+
+###
+
+### [RESGATE] Sem campo pontos → espera 400
+# @name resgateSepontos
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "cpf": "{{cpf_valido}}"
+}
+
+###
+
+### [RESGATE] Sem campo cpf → espera 400
+# @name resgateSemCpf
+POST {{baseUrl}}/resgates
+Content-Type: {{contentType}}
+
+{
+  "pontos": 10
+}
+
+
+# ==============================================================
+# 🔄  SINCRONIZAÇÃO (Bling → Banco)
+# ==============================================================
+
+### [SYNC] Executar rotina de sincronização completa
+# @name sync
+POST {{baseUrl}}/sync
+Content-Type: {{contentType}}
+
+
+# ==============================================================
+# 🚫  ROTAS INEXISTENTES
+# ==============================================================
+
+### [404] Rota que não existe → espera 404 NOT_FOUND
+# @name rotaInexistente
+GET {{baseUrl}}/naoexiste
+Content-Type: {{contentType}}
+
+###
+
+### [404] Método errado numa rota existente → espera 404
+# @name metodoErrado
+DELETE {{baseUrl}}/clients
+Content-Type: {{contentType}}

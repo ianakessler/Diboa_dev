@@ -1,0 +1,30 @@
+### Resgate válido
+POST http://localhost:9999/resgate
+Content-Type: application/json
+
+{
+  "cpf": "28302220833",
+  "pontos": 1
+}
+
+###
+
+### Pontos insuficientes
+POST http://localhost:9999/resgate
+Content-Type: application/json
+
+{
+  "cpf": "28302220833",
+  "pontos": 999999
+}
+
+###
+
+### Cliente inexistente
+POST http://localhost:9999/resgate
+Content-Type: application/json
+
+{
+  "cpf": "00000000000",
+  "pontos": 10
+}
