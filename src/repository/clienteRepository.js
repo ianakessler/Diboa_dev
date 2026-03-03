@@ -70,3 +70,15 @@ export async function findByCpfForUpdate(conn, cpf) {
   );
   return rows[0] ?? null;
 }
+
+
+/**
+ * Update a client
+ */
+export async function updateClient(conn, cpf, pontos, nome, id) {
+    await conn.query(
+      `UPDATE clientes SET pontos = ?, cpf = ?,
+      nome = ? WHERE id = ?`,
+      [pontos, cpf, nome, id]
+    );
+} 

@@ -17,3 +17,13 @@ export async function getClientByCpf(req, res, next) {
     next(error);
   }
 }
+
+export async function editClient(req, res, next) {
+  try {
+    const {cpf, pontos, nome} = req.body;
+    await clienteService.editByCpf(cpf, pontos, nome);
+    return res.status(200).json({res: "Cliente atualizado"});
+  } catch (error) {
+    next(error);
+  }
+}
