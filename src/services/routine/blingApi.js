@@ -3,7 +3,7 @@ import logger from '../../config/logger.js';
 const BASE_URL = 'https://api.bling.com.br/Api/v3';
 
 function getToken() {
-  const token = "4cd4807baa86fe7e27cdbe96e0454128fd8e5969";
+  const token = "2309daf0776586877c75ebf5493e792c1272d62b";
   if (!token) throw new Error('BLING_TOKEN environment variable not set');
   return token;
 }

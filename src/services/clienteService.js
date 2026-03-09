@@ -31,9 +31,9 @@ export async function getByCpf(rawCpf) {
 export async function editByCpf(rawCpf, pontos, nome) {
 
   const cpf = validateCpf(rawCpf);
-  const conn = await conn.getConnection();
+  const conn = await pool.getConnection();
   try {
-    await pool.beginTransaction();
+    await conn.beginTransaction();
     const cliente = await clienteRepo.findByCpfForUpdate(conn, cpf);
     if (!cliente)
     {
@@ -47,6 +47,29 @@ export async function editByCpf(rawCpf, pontos, nome) {
     throw error;
   } finally
   {
+    conn.release();
+  }
+}
+
+export async function deleteByCpf(rawCpf)
+{
+  const cpf =  validateCpf(rawCpf);
+  const conn = await pool.getConnection();
+  try{
+    await conn.beginTransaction();
+    console.log(`[DEBUG 2] req.body: cpf == ${cpf}`);
+    const client = await clienteRepo.findByCpf(cpf);
+    if (!client) {
+      await conn.rollback();
+      throw new NotFoundError('Cliente não encontrado');
+    }
+    await clienteRepo.deleteClientById(conn, client.id);
+    await conn.commit();
+  } catch (error){
+    await conn.rollback();
+    throw error;
+  }
+  finally{
     conn.release();
   }
 }

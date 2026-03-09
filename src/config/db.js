@@ -3,8 +3,8 @@ import logger from './logger.js';
 
 
  const DB_HOST = 'localhost';
- const DB_USER = 'root';
- const DB_PASSWORD= 'root';
+ const DB_USER = 'ian@localhost';
+ const DB_PASSWORD= '@Pfdfqm1';
  const DB_NAME = 'diboa_dev';
  const DB_CONNECTION_LIMIT = '10';
 

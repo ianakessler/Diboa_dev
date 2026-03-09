@@ -82,3 +82,10 @@ export async function updateClient(conn, cpf, pontos, nome, id) {
       [pontos, cpf, nome, id]
     );
 } 
+
+export async function deleteClientById(conn, id){
+  await conn.query(
+    `DELETE FROM clientes WHERE id = ?`,
+    [id]
+  );
+}

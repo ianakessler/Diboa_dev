@@ -27,3 +27,17 @@ export async function editClient(req, res, next) {
     next(error);
   }
 }
+
+export async function deleteClient(req, res, next)
+{
+  try{
+    const {cpf} = req.body;
+    console.log(`[DEBUG] req.body: cpf == ${cpf}`);
+    await clienteService.deleteByCpf(cpf);
+    return res.status(200).json({res: "Cliente deletado com sucesso!"});
+  } catch (error)
+  {
+    next(error);
+  }
+
+}

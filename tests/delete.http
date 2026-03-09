@@ -1,0 +1,8 @@
+#DELETE CLIENT
+
+DELETE http://localhost:3000/api/v1/deleteClient
+Content-Type: application/json
+
+{
+    "cpf": "39465668800"
+}

@@ -208,6 +208,22 @@ Content-Type: {{contentType}}
   "pontos": 10
 }
 
+# ==============================================================
+# edição de clientes por cpf
+# ==============================================================
+
+# [EDIÇÂO] edição válida
+
+# @name editarPorCpf
+
+POST {{baseUrl}}/editClient
+Content-Type: {{contentType}}
+
+{
+  "cpf": "05111403809",
+  "pontos": 99999,
+  "nome": "manezinho"
+}
 
 # ==============================================================
 # 🔄  SINCRONIZAÇÃO (Bling → Banco)
