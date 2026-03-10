@@ -92,8 +92,10 @@ export async function deleteClientById(conn, id){
 
 export async function insertResgate(conn, cliente_id, pontos) {
   try{
-    await pool.query(
-      `INSERT INTO historico_resgates (cliente_id, pontos) VALUES (?, ?)`
+    console.log(cliente_id);
+    console.log(pontos);
+    await conn.query(
+      `INSERT INTO historico_resgates (cliente_id, pontos_resgatados) values(?, ?)`,
       [cliente_id, pontos]
     );
   } catch (error) {
@@ -103,8 +105,9 @@ export async function insertResgate(conn, cliente_id, pontos) {
 
 export async function getResgaresById(cliente_id) {
   console.log(cliente_id);
-  await pool.query(
+  const [rows] = await pool.query(
     `SELECT data_resgate, pontos_resgatados FROM historico_resgates WHERE cliente_id = ?`,
     [cliente_id]
   );
+  return rows;
 }

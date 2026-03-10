@@ -9,7 +9,7 @@
 
 
 
-GET {{baseUrl}}/historico/resgates/491.374.008-35
+GET {{baseUrl}}/historico/resgates/49137400835
 Content-Type: {{contentType}}
 
 
