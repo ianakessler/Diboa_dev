@@ -2,6 +2,7 @@ import * as clienteRepo from '../repository/clienteRepository.js';
 import { NotFoundError } from '../errors/AppError.js';
 import { validateCpf } from '../validators/index.js';
 import pool from '../config/db.js';
+import * as vendasRepo from '../repository/vendaRepository.js';
 
 /**
  * Returns all clients.
@@ -71,5 +72,28 @@ export async function deleteByCpf(rawCpf)
   }
   finally{
     conn.release();
+  }
+}
+
+export async function montarHistorico(rawCpf) {
+  const cpf = validateCpf(rawCpf);
+  try{
+      const client = await clienteRepo.findByCpf(cpf);
+      const historico = await clienteRepo.getResgaresById(client.cliente_id);
+      return {client, historico};
+    } catch (error)
+    {
+      throw error;
+    }
+}
+
+export async function getHistory(rawCpf) {
+  const cpf = validateCpf(rawCpf);
+  try{
+    const client = await clienteRepo.findByCpf(cpf);
+    const historico_vendas =  await vendasRepo.findByClienteId(client.cliente_id);
+    return {client, historico_vendas};
+  } catch (error){
+    throw error;
   }
 }

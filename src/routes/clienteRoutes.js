@@ -6,8 +6,9 @@ const router = Router();
 
 router.get('/clients', getAllClients);
 router.get('/clients/cpf/:cpf', getClientByCpf);
+router.get('/historicoResgates/:cpf', )
 router.post('/sync', syncClients);
 router.post('/editClient', editClient);
-router.delete('/deleteClient', deleteClient);
+router.delete('/deleteClient/:cpf', deleteClient);
 
 export default router;

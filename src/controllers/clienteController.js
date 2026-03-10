@@ -31,7 +31,7 @@ export async function editClient(req, res, next) {
 export async function deleteClient(req, res, next)
 {
   try{
-    const {cpf} = req.body;
+    const cpf = req.params.cpf;
     console.log(`[DEBUG] req.body: cpf == ${cpf}`);
     await clienteService.deleteByCpf(cpf);
     return res.status(200).json({res: "Cliente deletado com sucesso!"});
@@ -40,4 +40,24 @@ export async function deleteClient(req, res, next)
     next(error);
   }
 
+}
+
+export async function getHistoricoResgates(req, res, next){
+  try{
+    const doc = req.params.cpf;
+    const historico = await clienteService.montarHistorico(doc);
+    return res.status(200).json(historico);
+  } catch (error){
+    next(error);
+  }
+}
+
+export async function getAllVendas(req, res, next) {
+  try{
+    const doc = req.params.cpf;
+    const historico = await clienteService.getHistory(doc);
+    return res.status(200).json(historico);
+  } catch (error){
+    next(error);
+  }
 }
