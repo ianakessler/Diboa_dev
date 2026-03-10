@@ -26,7 +26,7 @@ export async function findAll() {
  */
 export async function findByCpf(cpf) {
   const [rows] = await pool.query(
-    'SELECT id, nome, cpf, pontos FROM clientes WHERE cpf = ? LIMIT 1',
+    'SELECT id, nome, cpf, client_id, pontos FROM clientes WHERE cpf = ? LIMIT 1',
     [cpf]
   );
   return rows[0] ?? null;
@@ -65,7 +65,7 @@ export async function deductPontos(conn, id, pontos) {
  */
 export async function findByCpfForUpdate(conn, cpf) {
   const [rows] = await conn.query(
-    'SELECT id, pontos FROM clientes WHERE cpf = ? LIMIT 1 FOR UPDATE',
+    'SELECT id, client_id, pontos FROM clientes WHERE cpf = ? LIMIT 1 FOR UPDATE',
     [cpf]
   );
   return rows[0] ?? null;
@@ -92,8 +92,8 @@ export async function deleteClientById(conn, id){
 
 export async function insertResgate(conn, cliente_id, pontos) {
   try{
-    await conn.query(
-      `INSERT INTO historico_resgates cliente_id = ? pontos = ?`,
+    await pool.query(
+      `INSERT INTO historico_resgates (cliente_id, pontos) VALUES (?, ?)`
       [cliente_id, pontos]
     );
   } catch (error) {
@@ -101,9 +101,9 @@ export async function insertResgate(conn, cliente_id, pontos) {
   }
 }
 
-export async function getResgaresById(conn, cliente_id) {
-
-  await conn.query(
+export async function getResgaresById(cliente_id) {
+  console.log(cliente_id);
+  await pool.query(
     `SELECT data_resgate, pontos_resgatados FROM historico_resgates WHERE cliente_id = ?`,
     [cliente_id]
   );

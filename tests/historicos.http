@@ -1,0 +1,16 @@
+### HISTORICOS
+
+
+@baseUrl = http://localhost:3000/api/v1
+@contentType = application/json
+
+
+## GET HISTORICO DE RESGATES
+
+
+
+GET {{baseUrl}}/historico/resgates/491.374.008-35
+Content-Type: {{contentType}}
+
+
+

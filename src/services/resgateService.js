@@ -26,9 +26,9 @@ export async function resgatar(rawCpf, rawPontos) {
         `Saldo insuficiente. Disponível: ${cliente.pontos}, solicitado: ${pontos}`
       );
     }
-
+    console.log("AAAAA: ", cliente);
     await clienteRepo.deductPontos(conn, cliente.id, pontos);
-    await clienteRepo.insertResgate(conn, cliente.client_id, pontos);
+    await clienteRepo.insertResgate(cliente.client_id, pontos);
     await conn.commit();
 
     logger.info('Resgate efetuado', { clienteId: cliente.id, pontos });

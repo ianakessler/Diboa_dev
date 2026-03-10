@@ -15,6 +15,7 @@ import pool from '../config/db.js';
  * @returns {Promise<Venda[]>}
  */
 export async function findByClienteId(clienteId) {
+  console.log("Cliente_id recebdio = ", clienteId);
   const [rows] = await pool.query(
     'SELECT numero_pedido, data_venda, valor_total FROM vendas WHERE cliente_id = ?',
     [clienteId]

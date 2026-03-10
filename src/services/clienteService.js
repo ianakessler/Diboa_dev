@@ -79,7 +79,7 @@ export async function montarHistorico(rawCpf) {
   const cpf = validateCpf(rawCpf);
   try{
       const client = await clienteRepo.findByCpf(cpf);
-      const historico = await clienteRepo.getResgaresById(client.cliente_id);
+      const historico = await clienteRepo.getResgaresById(client.client_id);
       return {client, historico};
     } catch (error)
     {
@@ -91,7 +91,7 @@ export async function getHistory(rawCpf) {
   const cpf = validateCpf(rawCpf);
   try{
     const client = await clienteRepo.findByCpf(cpf);
-    const historico_vendas =  await vendasRepo.findByClienteId(client.cliente_id);
+    const historico_vendas =  await vendasRepo.findByClienteId(client.client_id);
     return {client, historico_vendas};
   } catch (error){
     throw error;
