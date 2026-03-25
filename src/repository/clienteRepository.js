@@ -14,7 +14,7 @@ import pool from '../config/db.js';
  */
 export async function findAll() {
   const [rows] = await pool.query(
-    'SELECT id, nome, cpf, pontos FROM clientes ORDER BY nome ASC'
+    'SELECT id, nome, numero_documento, pontos FROM clientes ORDER BY nome ASC'
   );
   return rows;
 }
@@ -23,10 +23,10 @@ export async function findAll() {
  * Returns a single client by CPF (digits only).
  * @param {string} cpf
  * @returns {Promise<Cliente|null>}
- */
+*/
 export async function findByCpf(cpf) {
   const [rows] = await pool.query(
-    'SELECT id, nome, cpf, client_id, pontos FROM clientes WHERE cpf = ? LIMIT 1',
+    'SELECT id, nome, numero_documento, client_id, pontos FROM clientes WHERE numero_documento = ? LIMIT 1',
     [cpf]
   );
   return rows[0] ?? null;
@@ -39,7 +39,7 @@ export async function findByCpf(cpf) {
  */
 export async function upsertIgnore(conn, { nome, cpf, clienteId }) {
   await conn.query(
-    'INSERT IGNORE INTO clientes (nome, cpf, client_id) VALUES (?, ?, ?)',
+    'INSERT IGNORE INTO clientes (nome, numero_documento, client_id) VALUES (?, ?, ?)',
     [nome, cpf, clienteId]
   );
 }
@@ -65,7 +65,7 @@ export async function deductPontos(conn, id, pontos) {
  */
 export async function findByCpfForUpdate(conn, cpf) {
   const [rows] = await conn.query(
-    'SELECT id, client_id, pontos FROM clientes WHERE cpf = ? LIMIT 1 FOR UPDATE',
+    'SELECT id, client_id, pontos FROM clientes WHERE numero_documento = ? LIMIT 1 FOR UPDATE',
     [cpf]
   );
   return rows[0] ?? null;
@@ -77,7 +77,7 @@ export async function findByCpfForUpdate(conn, cpf) {
  */
 export async function updateClient(conn, cpf, pontos, nome, id) {
     await conn.query(
-      `UPDATE clientes SET pontos = ?, cpf = ?,
+      `UPDATE clientes SET pontos = ?, numero_documento = ?,
       nome = ? WHERE id = ?`,
       [pontos, cpf, nome, id]
     );

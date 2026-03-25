@@ -1,3 +1,12 @@
+0);
+}
+
+/**
+ * Fetches today's sales orders from Bling API.
+ * @param {{ dataInicial?: string, dataFinal?: string, limite?: number }} [opts]
+ * @returns {Promise<{ data: Array<any> }>}
+ */
+export async function fetchPedidosVendas(opts = {}) {
 ### ============================================================
 ### Diboa Cashback API — Testes REST Client (VS Code)
 ### Extensão: REST Client (humao.rest-client)
@@ -202,7 +211,7 @@ Content-Type: {{contentType}}
 ### [RESGATE] Sem campo cpf → espera 400
 # @name resgateSemCpf
 POST {{baseUrl}}/resgates
-Content-Type: {{contentType}}
+Content-Type: 961a949ffc111ff91899e15d224dc518905a9843{{contentType}}
 
 {
   "pontos": 10

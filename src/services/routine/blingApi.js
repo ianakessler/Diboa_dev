@@ -3,7 +3,7 @@ import logger from '../../config/logger.js';
 const BASE_URL = 'https://api.bling.com.br/Api/v3';
 
 function getToken() {
-  const token = "ea4793f30da16d388704aef2ece6f51a9e5603c2";
+  const token = "27dd22fe11ade251abf9ea2fbc373f36733e5b2d";
   if (!token) throw new Error('BLING_TOKEN environment variable not set');
   return token;
 }
@@ -20,8 +20,8 @@ function getTodayIso() {
 export async function fetchPedidosVendas(opts = {}) {
   const today = getTodayIso();
   const params = new URLSearchParams({
-    dataInicial: "2026-03-07",
-    dataFinal: opts.dataFinal ?? today,
+    dataInicial: "2026-03-25",
+    dataFinal: "2026-03-25",
     limite: String(opts.limite ?? 10000),
   });
 
