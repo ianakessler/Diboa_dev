@@ -1,12 +1,4 @@
-0);
-}
 
-/**
- * Fetches today's sales orders from Bling API.
- * @param {{ dataInicial?: string, dataFinal?: string, limite?: number }} [opts]
- * @returns {Promise<{ data: Array<any> }>}
- */
-export async function fetchPedidosVendas(opts = {}) {
 ### ============================================================
 ### Diboa Cashback API — Testes REST Client (VS Code)
 ### Extensão: REST Client (humao.rest-client)
