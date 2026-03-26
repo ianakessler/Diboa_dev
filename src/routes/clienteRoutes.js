@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { deleteClient, editClient, getAllClients, getAllVendas, getClientByCpf, getHistoricoResgates } from '../controllers/clienteController.js';
 import { syncClients } from '../controllers/syncController.js';
 
-const router = Router();
+const  router = Router();
 
 router.get('/clients', getAllClients);
 router.get('/clients/cpf/:cpf', getClientByCpf);
