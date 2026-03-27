@@ -97,3 +97,12 @@ export async function getHistory(rawCpf) {
     throw error;
   }
 }
+
+export async function updateClientInfos(rawCpf) {
+  const cpf = validateCpf(rawCpf);
+  const BASEURL = 'https://api.bling.com.br/Api/v3';
+  try{
+    const client = await clienteRepo.findByCpf(cpf);
+    const response = await 
+  }
+}

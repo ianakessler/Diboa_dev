@@ -49,4 +49,8 @@ export async function fetchPedidosVendas(opts = {}) {
   logger.info('Bling API: pedidos recebidos', { total: json.data?.length ?? 0 });
   return json;
 }
- 
+
+
+export async function fetchClientByID() {
+  
+}

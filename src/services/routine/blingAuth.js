@@ -129,8 +129,13 @@ export async function getValidAccessToken() {
     return refreshAccessToken(record.refresh_token)
 }
 
-export function getAuthorizationUrl(redirectUri, state = '') {
+export function getAuthorizationUrl(redirectUri, state) {
     const { client_id } = getCredentials();
+
+    if (!state) {
+        state = 'state_' + Math.random().toString(36).substring(7) + '_' + Date.now();
+    }
+
     const params = new URLSearchParams({
         response_type: 'code',
         client_id:     client_id,
