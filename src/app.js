@@ -9,6 +9,8 @@ import {
   getAuthorizationUrl,
   exchangeCodeForTokens,
 } from './services/routine/blingAuth.js';
+import 'dotenv/config'
+
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;

@@ -28,7 +28,7 @@ async function loadTokensFromDB() {
     return rows[0] ?? null;
 }
 
-async function saveTokensToDB({ access_token, refreshToken, expiresIn }) {
+async function saveTokensToDB({ accessToken, refreshToken, expiresIn }) {
     const expiresAt = Date.now() + expiresIn * 1000;
     await pool.query(
         `
@@ -39,7 +39,7 @@ async function saveTokensToDB({ access_token, refreshToken, expiresIn }) {
        refresh_token = VALUES(refresh_token),
        expires_at    = VALUES(expires_at)
         `,
-        [access_token, refreshToken, expiresAt]
+        [accessToken, refreshToken, expiresAt]
     );
     logger.info('Bling tokens salvos no banco', {
     expiresAt: new Date(expiresAt).toISOString(),
@@ -130,10 +130,10 @@ export async function getValidAccessToken() {
 }
 
 export function getAuthorizationUrl(redirectUri, state = '') {
-    const { clientId } = getCredentials();
+    const { client_id } = getCredentials();
     const params = new URLSearchParams({
         response_type: 'code',
-        client_id:     clientId,
+        client_id:     client_id,
         redirect_uri:  redirectUri,
         ...(state ? { state } : {}),
     });
