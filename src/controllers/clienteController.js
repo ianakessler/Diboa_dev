@@ -20,7 +20,8 @@ export async function getClientByCpf(req, res, next) {
 
 export async function editClient(req, res, next) {
   try {
-    const {cpf, pontos, nome} = req.body;
+    const cpf = req.params.cpf;
+    const { pontos, nome } = req.body;
     await clienteService.editByCpf(cpf, pontos, nome);
     return res.status(200).json({res: "Cliente atualizado"});
   } catch (error) {
@@ -32,7 +33,6 @@ export async function deleteClient(req, res, next)
 {
   try{
     const cpf = req.params.cpf;
-    console.log(`[DEBUG] req.body: cpf == ${cpf}`);
     await clienteService.deleteByCpf(cpf);
     return res.status(200).json({res: "Cliente deletado com sucesso!"});
   } catch (error)

@@ -1,16 +1,11 @@
 import pool from '../../config/db.js';
 import logger from '../../config/logger.js';
-import dotenv from 'dotenv';
-
-dotenv.config({ path: '.env.local' });
-
 const BLING_TOKEN_URL = 'https://www.bling.com.br/Api/v3/oauth/token';
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
 function getCredentials() {
     const client_id = process.env.CLIENT_ID;
     const client_secret = process.env.CLIENT_SECRET;
-    console.log("CLIENTE_ID: ", client_id);
     if (!client_id || !client_secret)
         throw new Error('BLING CLIENT ID AND CLIENT SECRET NEDEED!');
     return { client_id, client_secret };

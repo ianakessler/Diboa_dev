@@ -2,11 +2,11 @@ import mysql from 'mysql2/promise';
 import logger from './logger.js';
 
 
- const DB_HOST = 'localhost';
- const DB_USER = 'ian@localhost';
- const DB_PASSWORD= '@Pfdfqm1';
- const DB_NAME = 'diboa_dev';
- const DB_CONNECTION_LIMIT = '10';
+const DB_HOST = process.env.DB_HOST ?? 'localhost';
+const DB_USER = process.env.DB_USER;
+const DB_PASSWORD = process.env.DB_PASSWORD;
+const DB_NAME = process.env.DB_NAME;
+const DB_CONNECTION_LIMIT = process.env.DB_CONNECTION_LIMIT ?? '10';
 
 
 if (!DB_USER || !DB_PASSWORD || !DB_NAME) {

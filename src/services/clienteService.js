@@ -58,8 +58,7 @@ export async function deleteByCpf(rawCpf)
   const conn = await pool.getConnection();
   try{
     await conn.beginTransaction();
-    console.log(`[DEBUG 2] req.body: cpf == ${cpf}`);
-    const client = await clienteRepo.findByCpf(cpf);
+    const client = await clienteRepo.findByCpfForUpdate(conn, cpf);
     if (!client) {
       await conn.rollback();
       throw new NotFoundError('Cliente não encontrado');
@@ -77,32 +76,17 @@ export async function deleteByCpf(rawCpf)
 
 export async function montarHistorico(rawCpf) {
   const cpf = validateCpf(rawCpf);
-  try{
-      const client = await clienteRepo.findByCpf(cpf);
-      const historico = await clienteRepo.getResgaresById(client.client_id);
-      return {client, historico};
-    } catch (error)
-    {
-      throw error;
-    }
+  const client = await clienteRepo.findByCpf(cpf);
+  if (!client) throw new NotFoundError('Cliente não encontrado');
+  const historico = await clienteRepo.getResgaresById(client.client_id);
+  return { client, historico };
 }
 
 export async function getHistory(rawCpf) {
   const cpf = validateCpf(rawCpf);
-  try{
-    const client = await clienteRepo.findByCpf(cpf);
-    const historico_vendas =  await vendasRepo.findByClienteId(client.client_id);
-    return {client, historico_vendas};
-  } catch (error){
-    throw error;
-  }
+  const client = await clienteRepo.findByCpf(cpf);
+  if (!client) throw new NotFoundError('Cliente não encontrado');
+  const historico_vendas = await vendasRepo.findByClienteId(client.client_id);
+  return { client, historico_vendas };
 }
 
-export async function updateClientInfos(rawCpf) {
-  const cpf = validateCpf(rawCpf);
-  const BASEURL = 'https://api.bling.com.br/Api/v3';
-  try{
-    const client = await clienteRepo.findByCpf(cpf);
-    const response = await 
-  }
-}

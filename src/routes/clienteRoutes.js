@@ -9,7 +9,7 @@ router.get('/clients/cpf/:cpf', getClientByCpf);
 router.get('/historico/resgates/:cpf', getHistoricoResgates);
 router.get('/historico/compras/:cpf',getAllVendas);
 router.post('/sync', syncClients);
-router.post('/editClient', editClient);
+router.patch('/clients/:cpf', editClient);
 router.delete('/clients/:cpf', deleteClient);
 
 export default router;
