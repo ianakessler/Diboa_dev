@@ -40,8 +40,8 @@ async function blingFetch(path, options = {}) {
 export async function fetchPedidosVendas(opts = {}) {
   const today = getTodayIso();
   const params = new URLSearchParams({
-    dataInicial: opts.dataInicial ?? today,
-    dataFinal:   opts.dataFinal   ?? today,
+    dataInicial: "2026-04-10" ?? today,
+    dataFinal:   "2026-04-13"   ?? today,
     limite:      String(opts.limite ?? 10000),
   });
  

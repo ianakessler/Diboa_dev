@@ -55,6 +55,8 @@ export async function executarRotina() {
   const response = await fetchPedidosVendas();
   const pedidos = response.data ?? [];
 
+  console.log(pedidos);
+
   if (pedidos.length === 0) {
     logger.info('Nenhum pedido retornado pela API');
     return { clientesUpserted: 0, vendasInseridas: 0, vendasProcessadas: 0 };

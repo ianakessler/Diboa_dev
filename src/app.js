@@ -18,12 +18,19 @@ const PORT = process.env.PORT ?? 9292;
 
 // ── Middlewares ──────────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    if (req.originalUrl?.startsWith('/api/v1/webhooks')) {
+      req.rawBody = buf;
+    }
+  },
+}));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Too many requests, try again later' },
+  skip: (req) => req.originalUrl?.startsWith('/api/v1/webhooks'),
 }));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -47,7 +54,7 @@ const server = app.listen(PORT, () => {
 });
 
 // ── Cron: rotina diária de sincronização (23:59) ─────────────────────────────
-cron.schedule('59 23 * * *', async () => {
+cron.schedule('34 23 * * *', async () => {
   logger.info('Cron: iniciando rotina diaria de sincronizacao');
   try {
     const result = await executarRotina();

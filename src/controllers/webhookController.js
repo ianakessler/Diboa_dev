@@ -7,6 +7,6 @@ export async function handleBlingVendaWebhook(req, res) {
   try {
     await processarWebhookVenda(req.body);
   } catch (error) {
-    logger.error('Erro ao processar webhook Bling', { error: error.message });
+    logger.error('Erro ao processar webhook Bling', { error: error.message, stack: error.stack });
   }
 }
