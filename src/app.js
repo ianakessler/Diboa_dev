@@ -14,6 +14,7 @@ import pool from './config/db.js';
 import { executarRotina } from './services/routine/syncRoutine.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT ?? 9292;
 
 // ── Middlewares ──────────────────────────────────────────────────────────────

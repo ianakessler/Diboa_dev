@@ -1,0 +1,98 @@
+[2026-04-14T21:42:28.055Z] [INFO] Server running on port 9595 {"env":"development"}
+[2026-04-14T21:43:23.586Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567300588,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:43:29.363Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567300588,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:44:04.268Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567300588,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:44:39.337Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567300588,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:44:39.727Z] [DEBUG] New MySQL connection established
+[2026-04-14T21:44:41.315Z] [INFO] Bling API: pedido consultado {"pedidoId":25567300588}
+[2026-04-14T21:44:41.689Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:44:41.689Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25567300588,"contatoId":15590339554}
+[2026-04-14T21:46:32.841Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565430683,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:46:40.857Z] [INFO] Bling API: pedido consultado {"pedidoId":25565683628}
+[2026-04-14T21:46:41.210Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:46:41.210Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25565683628,"contatoId":15590339554}
+[2026-04-14T21:47:04.047Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565845305,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:18.410Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557403705,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:18.605Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557403705,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:18.616Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557442242,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:18.932Z] [INFO] Bling API: pedido consultado {"pedidoId":25557417984}
+[2026-04-14T21:47:19.287Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:47:19.287Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25557417984,"contatoId":15590339554}
+[2026-04-14T21:47:20.049Z] [INFO] Bling API: pedido consultado {"pedidoId":25557442242}
+[2026-04-14T21:47:20.418Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:47:20.418Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25557442242,"contatoId":15590339554}
+[2026-04-14T21:47:20.492Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557625887,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:20.496Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557630369,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:20.629Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557574335,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:20.632Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557574335,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:20.703Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557642558,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:20.959Z] [INFO] Bling API: pedido consultado {"pedidoId":25557574335}
+[2026-04-14T21:47:21.095Z] [INFO] Bling API: pedido consultado {"pedidoId":25557653852}
+[2026-04-14T21:47:21.324Z] [ERROR] Erro ao processar webhook Bling {"error":"Bling API error 429: {\n  \"error\": {\n    \"type\": \"TOO_MANY_REQUESTS\",\n    \"message\": \"Limite de requisições atingido.\",\n    \"description\": \"O limite de requisições por segundo foi atingido, tente novamente mais tarde.\",\n    \"limit\": 3,\n    \"period\": \"second\"\n  }\n}\n","stack":"Error: Bling API error 429: {\n  \"error\": {\n    \"type\": \"TOO_MANY_REQUESTS\",\n    \"message\": \"Limite de requisições atingido.\",\n    \"description\": \"O limite de requisições por segundo foi atingido, tente novamente mais tarde.\",\n    \"limit\": 3,\n    \"period\": \"second\"\n  }\n}\n\n    at blingFetch (file:///home/iankessler/pessoal/diboa_dev/src/services/routine/blingApi.js:28:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async fetchContatoById (file:///home/iankessler/pessoal/diboa_dev/src/services/routine/blingApi.js:70:16)\n    at async processarWebhookVenda (file:///home/iankessler/pessoal/diboa_dev/src/services/webhookService.js:37:19)\n    at async handleBlingVendaWebhook (file:///home/iankessler/pessoal/diboa_dev/src/controllers/webhookController.js:8:5)"}
+[2026-04-14T21:47:21.400Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25564115845,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:21.402Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565294480,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:21.450Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:47:21.450Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25557653852,"contatoId":15590339554}
+[2026-04-14T21:47:22.600Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565994331,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:24.195Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25566064027,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:24.534Z] [INFO] Bling API: pedido consultado {"pedidoId":25565994331}
+[2026-04-14T21:47:24.883Z] [INFO] Bling API: contato consultado {"contatoId":17946779156}
+[2026-04-14T21:47:25.293Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565938309,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:25.293Z] [INFO] Webhook processado com sucesso {"pedidoId":25565994331,"cpf":"39866526801","total":102}
+[2026-04-14T21:47:26.386Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565994331,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:26.790Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565430683,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:26.836Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25564115845,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:26.914Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565269701,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:27.034Z] [INFO] Bling API: pedido consultado {"pedidoId":25566064027}
+[2026-04-14T21:47:27.374Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:47:27.374Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25566064027,"contatoId":15590339554}
+[2026-04-14T21:47:31.096Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25566047040,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:31.098Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25566047040,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:31.219Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25566047040,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:47:39.286Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25566064027,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:52:39.988Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25556792664,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:52:42.198Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25556792664,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:52:51.364Z] [INFO] Bling API: pedido consultado {"pedidoId":25557031402}
+[2026-04-14T21:52:51.743Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:52:51.744Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25557031402,"contatoId":15590339554}
+[2026-04-14T21:52:58.584Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25554360239,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:00.695Z] [INFO] Bling API: pedido consultado {"pedidoId":25557220801}
+[2026-04-14T21:53:01.064Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:53:01.064Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25557220801,"contatoId":15590339554}
+[2026-04-14T21:53:01.442Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557298324,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:07.301Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25564115845,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:08.589Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565424143,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:08.717Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565475552,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:09.187Z] [INFO] Bling API: pedido consultado {"pedidoId":25565424143}
+[2026-04-14T21:53:09.550Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:53:09.550Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25565424143,"contatoId":15590339554}
+[2026-04-14T21:53:14.731Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25555283503,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:21.995Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25556598201,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:23.691Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565683628,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:30.838Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567224723,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:34.402Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557109980,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:34.815Z] [INFO] Bling API: pedido consultado {"pedidoId":25556953444}
+[2026-04-14T21:53:34.948Z] [INFO] Bling API: pedido consultado {"pedidoId":25557109980}
+[2026-04-14T21:53:35.117Z] [ERROR] Erro ao processar webhook Bling {"error":"Bling API error 429: {\n  \"error\": {\n    \"type\": \"TOO_MANY_REQUESTS\",\n    \"message\": \"Limite de requisições atingido.\",\n    \"description\": \"O limite de requisições por segundo foi atingido, tente novamente mais tarde.\",\n    \"limit\": 3,\n    \"period\": \"second\"\n  }\n}\n","stack":"Error: Bling API error 429: {\n  \"error\": {\n    \"type\": \"TOO_MANY_REQUESTS\",\n    \"message\": \"Limite de requisições atingido.\",\n    \"description\": \"O limite de requisições por segundo foi atingido, tente novamente mais tarde.\",\n    \"limit\": 3,\n    \"period\": \"second\"\n  }\n}\n\n    at blingFetch (file:///home/iankessler/pessoal/diboa_dev/src/services/routine/blingApi.js:28:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async fetchContatoById (file:///home/iankessler/pessoal/diboa_dev/src/services/routine/blingApi.js:70:16)\n    at async processarWebhookVenda (file:///home/iankessler/pessoal/diboa_dev/src/services/webhookService.js:37:19)\n    at async handleBlingVendaWebhook (file:///home/iankessler/pessoal/diboa_dev/src/controllers/webhookController.js:8:5)"}
+[2026-04-14T21:53:35.184Z] [INFO] Bling API: contato consultado {"contatoId":16865463876}
+[2026-04-14T21:53:35.321Z] [INFO] Webhook processado com sucesso {"pedidoId":25556953444,"cpf":"12036801714","total":276}
+[2026-04-14T21:53:37.198Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25554978743,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:37.321Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25557265307,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:37.327Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25555785469,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:52.840Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565845305,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:53:53.217Z] [INFO] Bling API: pedido consultado {"pedidoId":25565845305}
+[2026-04-14T21:53:53.578Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T21:53:53.578Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25565845305,"contatoId":15590339554}
+[2026-04-14T21:54:16.898Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565938309,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:54:30.376Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25565938309,"situacao":{"id":6,"valor":0}}
+[2026-04-14T21:58:16.091Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567224723,"situacao":{"id":6,"valor":0}}
+[2026-04-14T22:00:03.323Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567391609,"situacao":{"id":6,"valor":0}}
+[2026-04-14T22:00:04.905Z] [INFO] Bling API: pedido consultado {"pedidoId":25567391609}
+[2026-04-14T22:00:05.265Z] [INFO] Bling API: contato consultado {"contatoId":15590339554}
+[2026-04-14T22:00:05.265Z] [INFO] Webhook ignorado: CPF inválido ou ausente {"pedidoId":25567391609,"contatoId":15590339554}
+[2026-04-14T22:00:46.828Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567395441,"situacao":{"id":6,"valor":0}}
+[2026-04-14T22:01:09.983Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567395441,"situacao":{"id":6,"valor":0}}
+[2026-04-14T22:01:31.771Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567395441,"situacao":{"id":6,"valor":0}}
+[2026-04-14T22:03:14.826Z] [INFO] Webhook ignorado: situação não confirmada {"pedidoId":25567395441,"situacao":{"id":6,"valor":0}}
+^C[2026-04-14T22:03:49.228Z] [INFO] SIGINT received. Shutting down gracefully...
+[2026-04-14T22:03:49.230Z] [INFO] MySQL pool closed. Process exiting.

@@ -2,32 +2,67 @@ import { cpf as cpfValidator } from 'cpf-cnpj-validator';
 import pool from '../config/db.js';
 import * as clienteRepo from '../repository/clienteRepository.js';
 import * as vendaRepo from '../repository/vendaRepository.js';
+import { fetchPedidoById, fetchContatoById } from './routine/blingApi.js';
 import logger from '../config/logger.js';
 
 export async function processarWebhookVenda(body) {
-  const { dados } = body;
+  const { data } = body;
 
-  if (dados?.situacao?.valor !== 1) return;
+  if (!data?.id) {
+    logger.warn('Webhook ignorado: payload sem data.id', { body });
+    return;
+  }
 
-  const doc = dados.contato?.numeroDocumento?.replace(/\D/g, '');
-  if (!doc || !cpfValidator.isValid(doc)) return;
+  if (data.situacao && data.situacao.valor !== 1) {
+    logger.info('Webhook ignorado: situação não confirmada');
+    return;
+  }
 
+  const pedido = await fetchPedidoById(data.id);
+
+  
+    if (pedido.contato.id === 15590339554) {
+      logger.info('Webhook ignorado: Consumidor final sem registro');
+      return;
+    }
+  if (pedido.situacao?.valor !== 1) {
+    logger.info('Webhook ignorado após consulta: situação não confirmada', {
+      pedidoId: pedido.id,
+      situacao: pedido.situacao,
+    });
+    return;
+  }
+
+  const contato = await fetchContatoById(pedido.contato.id);
+
+  const doc = contato.numeroDocumento?.replace(/\D/g, '');
+  if (!doc || !cpfValidator.isValid(doc)) {
+    logger.info('Webhook ignorado: CPF inválido ou ausente', {
+      pedidoId: pedido.id,
+      contatoId: contato.id,
+    });
+    return;
+  }
+
+  console.log(contato);
+
+  // 7. Salvar no banco (transação)
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
 
     await clienteRepo.upsertIgnore(conn, {
-      nome: dados.contato.nome,
+      nome: contato.nome,
       cpf: doc,
-      clienteId: dados.contato.id,
+      clienteId: contato.id,
     });
 
     await vendaRepo.batchInsertIgnore(conn, [[
-      dados.id,
-      dados.numero,
-      dados.data,
-      dados.total,
-      dados.contato.id,
+      pedido.id,
+      pedido.numero,
+      pedido.data,
+      pedido.total,
+      contato.id,
     ]]);
 
     await conn.query(
@@ -35,16 +70,20 @@ export async function processarWebhookVenda(body) {
        JOIN vendas v ON c.client_id = v.cliente_id
        SET c.pontos = c.pontos + v.valor_total
        WHERE v.bling_pedido_id = ? AND v.processada = 0`,
-      [dados.id]
+      [pedido.id]
     );
 
     await conn.query(
       'UPDATE vendas SET processada = 1 WHERE bling_pedido_id = ? AND processada = 0',
-      [dados.id]
+      [pedido.id]
     );
 
     await conn.commit();
-    logger.info('Webhook processado', { pedidoId: dados.id, cpf: doc });
+    logger.info('Webhook processado com sucesso', {
+      pedidoId: pedido.id,
+      cpf: doc,
+      total: pedido.total,
+    });
   } catch (err) {
     await conn.rollback();
     throw err;

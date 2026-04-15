@@ -1,187 +1,248 @@
-# Instruções para Claude Code — Middleware de Webhook Bling
+# Guia: Corrigindo o Fluxo do Webhook Bling
 
-## Contexto do Projeto
+## O Problema
 
-Este é um sistema Node.js/Express (ESM, `"type": "module"`) de cashback por pontos chamado **Diboa**. Ele recebe webhooks do Bling (ERP) quando vendas são criadas/atualizadas, processa o CPF do cliente e credita pontos. O `CLIENT_SECRET` do Bling já existe em `process.env.CLIENT_SECRET` (usado no fluxo OAuth em `src/services/routine/blingAuth.js`).
+O webhook do Bling é apenas uma **notificação enxuta**. Ele avisa que algo aconteceu, mas não traz os dados completos. Veja o que chega vs. o que o `webhookService.js` atual tenta acessar:
 
----
-
-## Problema Principal
-
-O endpoint de webhook (`POST /api/v1/webhooks/bling/vendas`) **não valida a autenticidade** das requisições. Qualquer pessoa que conheça a URL pode enviar payloads falsos e creditar pontos indevidamente. Além disso, o `express.json()` global consome o body antes que se possa calcular o HMAC, tornando a validação impossível.
-
----
-
-## Tarefas a Executar (em ordem)
-
-### 1. Preservar o Raw Body para cálculo de HMAC
-
-**Arquivo:** `src/app.js`
-
-O `express.json()` é aplicado globalmente na linha ~20. Quando o Express faz o parse do JSON, o buffer original (raw body) é descartado. Para calcular o HMAC, é necessário o body exatamente como chegou (bytes brutos).
-
-**O que fazer:**
-
-Substituir o `app.use(express.json())` genérico por uma versão que salva o raw body, **mas apenas nas rotas de webhook** (para não desperdiçar memória nas demais rotas):
-
-```js
-// Substituir esta linha:
-app.use(express.json());
-
-// Por esta lógica:
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    // Salva o raw body apenas para rotas de webhook
-    if (req.originalUrl?.startsWith('/api/v1/webhooks')) {
-      req.rawBody = buf;
-    }
-  },
-}));
+```
+Chega no webhook              │  Código atual tenta acessar
+─────────────────────────────-│──────────────────────────────
+data.id ✅                    │  dados.id
+data.situacao.valor ✅        │  dados.situacao.valor
+data.contato.id ✅            │  dados.contato.id
+data.total ✅                 │  dados.total
+data.numero ✅                │  dados.numero
+data.data ✅                  │  dados.data
+                              │
+❌ NÃO EXISTE                │  dados.contato.nome
+❌ NÃO EXISTE                │  dados.contato.numeroDocumento
 ```
 
-> **Importante:** a função `verify` do `express.json()` é chamada antes do parse. O parâmetro `buf` é o Buffer com o body bruto. Salvar em `req.rawBody` não interfere no parse normal do JSON.
+Além disso, o código desestrutura `{ dados }` do body, mas a propriedade real é `data`.
+
+## A Solução
+
+O fluxo correto é:
+
+```
+Webhook chega → Valida situação → Busca detalhes do pedido na API
+→ Busca dados do contato na API → Processa e salva no banco
+```
 
 ---
 
-### 2. Criar o Middleware de Validação HMAC
+## Passo 1 — Exportar `blingFetch` e criar funções de consulta
 
-**Criar arquivo:** `src/middleware/blingSignature.js`
+O arquivo `src/services/routine/blingApi.js` já tem o wrapper `blingFetch`, mas ele não é exportado. Precisamos exportá-lo e adicionar duas funções novas.
 
-Este middleware deve:
-
-1. Ler o header `X-Bling-Signature-256` da requisição.
-2. Extrair o hash (removendo o prefixo `sha256=`).
-3. Gerar um HMAC-SHA256 usando o `req.rawBody` (Buffer) e o `process.env.CLIENT_SECRET` como chave.
-4. Comparar os dois hashes usando `crypto.timingSafeEqual` (previne timing attacks).
-5. Se a assinatura for inválida ou ausente, responder `401` e encerrar.
-6. Se válida, chamar `next()`.
-
-**Implementação esperada:**
+### Alterações em `src/services/routine/blingApi.js`
 
 ```js
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import logger from '../config/logger.js';
+import { getValidAccessToken } from './blingAuth.js';
+import logger from '../../config/logger.js';
 
-export function verifyBlingSignature(req, res, next) {
-  const signatureHeader = req.headers['x-bling-signature-256'];
+const BASE_URL = 'https://api.bling.com.br/Api/v3';
 
-  if (!signatureHeader) {
-    logger.warn('Webhook recebido sem header X-Bling-Signature-256', {
-      ip: req.ip,
-      path: req.path,
-    });
-    return res.status(401).json({ error: 'Assinatura ausente' });
+function getTodayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Wrapper genérico para chamadas autenticadas ao Bling.
+ * Obtém o token válido antes de cada requisição.
+ */
+export async function blingFetch(path, options = {}) {  // ← adicionar export
+  const token = await getValidAccessToken();
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Bling API error ${response.status}: ${body}`);
   }
 
-  const clientSecret = process.env.CLIENT_SECRET;
-  if (!clientSecret) {
-    logger.error('CLIENT_SECRET não configurado no .env');
-    return res.status(500).json({ error: 'Configuração interna ausente' });
-  }
+  return response.json();
+}
 
-  // O header vem no formato "sha256=<hex>"
-  const receivedHash = signatureHeader.replace(/^sha256=/, '');
+/**
+ * Busca um pedido de venda pelo ID.
+ * Retorna o objeto completo do pedido (com contato.id, total, etc).
+ *
+ * @param {number} pedidoId - ID do pedido no Bling
+ * @returns {Promise<Object>} - Dados completos do pedido
+ */
+export async function fetchPedidoById(pedidoId) {
+  const json = await blingFetch(`/pedidos/vendas/${pedidoId}`);
+  logger.info('Bling API: pedido consultado', { pedidoId });
+  return json.data;
+}
 
-  // Gerar HMAC com o raw body (Buffer) e o client_secret
-  const expectedHash = createHmac('sha256', clientSecret)
-    .update(req.rawBody)   // req.rawBody é o Buffer salvo no verify do express.json
-    .digest('hex');
+/**
+ * Busca um contato pelo ID.
+ * Retorna nome, numeroDocumento (CPF/CNPJ), etc.
+ *
+ * @param {number} contatoId - ID do contato no Bling
+ * @returns {Promise<Object>} - Dados completos do contato
+ */
+export async function fetchContatoById(contatoId) {
+  const json = await blingFetch(`/contatos/${contatoId}`);
+  logger.info('Bling API: contato consultado', { contatoId });
+  return json.data;
+}
 
-  // Comparação segura contra timing attacks
-  const receivedBuf = Buffer.from(receivedHash, 'hex');
-  const expectedBuf = Buffer.from(expectedHash, 'hex');
+/**
+ * Busca pedidos de venda do Bling (já existente).
+ */
+export async function fetchPedidosVendas(opts = {}) {
+  const today = getTodayIso();
+  const params = new URLSearchParams({
+    dataInicial: opts.dataInicial ?? today,
+    dataFinal:   opts.dataFinal   ?? today,
+    limite:      String(opts.limite ?? 10000),
+  });
 
-  if (receivedBuf.length !== expectedBuf.length || !timingSafeEqual(receivedBuf, expectedBuf)) {
-    logger.warn('Webhook com assinatura HMAC inválida', {
-      ip: req.ip,
-      path: req.path,
-    });
-    return res.status(401).json({ error: 'Assinatura inválida' });
-  }
-
-  next();
+  const json = await blingFetch(`/pedidos/vendas?${params}`);
+  logger.info('Bling API: pedidos recebidos', { total: json.data?.length ?? 0 });
+  return json;
 }
 ```
 
-**Notas sobre a implementação:**
-- Usar `node:crypto` (built-in, não precisa instalar nada).
-- O `timingSafeEqual` exige que os dois Buffers tenham o mesmo tamanho. Se `receivedHash` tiver tamanho diferente do esperado (64 chars hex para SHA-256), a comparação de `.length` já rejeita.
-- O encoding deve ser UTF-8 (padrão do Node.js para strings — já atende ao requisito do Bling).
+> **O que mudou:**
+> - `blingFetch` agora tem `export`
+> - Nova função `fetchPedidoById(pedidoId)` — chama `GET /pedidos/vendas/{id}`
+> - Nova função `fetchContatoById(contatoId)` — chama `GET /contatos/{id}`
+> - Removidos os valores hardcoded de data em `fetchPedidosVendas`
 
 ---
 
-### 3. Registrar o Middleware na Rota de Webhook
+## Passo 2 — Reescrever `webhookService.js`
 
-**Arquivo:** `src/routes/webhookRoutes.js`
+O service precisa buscar os dados faltantes na API antes de salvar no banco.
 
-Adicionar o import do middleware e aplicá-lo **antes** do controller na rota:
+### Novo `src/services/webhookService.js`
 
 ```js
-import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
-import { verifyBlingSignature } from '../middleware/blingSignature.js';
-import { handleBlingVendaWebhook } from '../controllers/webhookController.js';
+import { cpf as cpfValidator } from 'cpf-cnpj-validator';
+import pool from '../config/db.js';
+import * as clienteRepo from '../repository/clienteRepository.js';
+import * as vendaRepo from '../repository/vendaRepository.js';
+import { fetchPedidoById, fetchContatoById } from './routine/blingApi.js';
+import logger from '../config/logger.js';
 
-const router = Router();
+export async function processarWebhookVenda(body) {
+  // 1. Extrair dados do webhook (a propriedade é "data", não "dados")
+  const { data } = body;
 
-const webhookLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  message: { error: 'Too many webhook requests' },
-});
+  if (!data?.id) {
+    logger.warn('Webhook ignorado: payload sem data.id', { body });
+    return;
+  }
 
-// Ordem: rate limit → validar assinatura HMAC → controller
-router.post('/webhooks/bling/vendas', webhookLimiter, verifyBlingSignature, handleBlingVendaWebhook);
+  // 2. Checar situação (valor 1 = confirmado)
+  //    Se o webhook não trouxer situação, busca na API
+  if (data.situacao && data.situacao.valor !== 1) {
+    logger.info('Webhook ignorado: situação não confirmada', {
+      pedidoId: data.id,
+      situacao: data.situacao,
+    });
+    return;
+  }
 
-export default router;
+  // 3. Buscar dados completos do pedido na API do Bling
+  const pedido = await fetchPedidoById(data.id);
+
+  // 4. Validar situação do pedido completo (dupla checagem)
+  if (pedido.situacao?.valor !== 1) {
+    logger.info('Webhook ignorado após consulta: situação não confirmada', {
+      pedidoId: pedido.id,
+      situacao: pedido.situacao,
+    });
+    return;
+  }
+
+  // 5. Buscar dados do contato (nome, CPF)
+  const contato = await fetchContatoById(pedido.contato.id);
+
+  // 6. Validar CPF
+  const doc = contato.numeroDocumento?.replace(/\D/g, '');
+  if (!doc || !cpfValidator.isValid(doc)) {
+    logger.info('Webhook ignorado: CPF inválido ou ausente', {
+      pedidoId: pedido.id,
+      contatoId: contato.id,
+    });
+    return;
+  }
+
+  // 7. Salvar no banco (transação)
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await clienteRepo.upsertIgnore(conn, {
+      nome: contato.nome,
+      cpf: doc,
+      clienteId: contato.id,
+    });
+
+    await vendaRepo.batchInsertIgnore(conn, [[
+      pedido.id,
+      pedido.numero,
+      pedido.data,
+      pedido.total,
+      contato.id,
+    ]]);
+
+    await conn.query(
+      `UPDATE clientes c
+       JOIN vendas v ON c.client_id = v.cliente_id
+       SET c.pontos = c.pontos + v.valor_total
+       WHERE v.bling_pedido_id = ? AND v.processada = 0`,
+      [pedido.id]
+    );
+
+    await conn.query(
+      'UPDATE vendas SET processada = 1 WHERE bling_pedido_id = ? AND processada = 0',
+      [pedido.id]
+    );
+
+    await conn.commit();
+    logger.info('Webhook processado com sucesso', {
+      pedidoId: pedido.id,
+      cpf: doc,
+      total: pedido.total,
+    });
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
 ```
 
 ---
 
-### 4. Ajustar o Rate Limiter Global para Não Bloquear Webhooks
+## Passo 3 — Ajustar `webhookController.js`
 
-**Arquivo:** `src/app.js`
+O controller já está correto na estrutura, mas vale garantir que erros da API do Bling sejam logados.
 
-O rate limiter global (100 req / 15 min) pode bloquear retentativas legítimas do Bling. Webhooks vêm do servidor do Bling, não de usuários humanos — o rate limit por rota já cuida do controle.
-
-**O que fazer:** Excluir as rotas de webhook do rate limiter global:
-
-```js
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests, try again later' },
-  skip: (req) => req.path.startsWith('/webhooks/'),
-}));
-```
-
-> **Nota:** o `req.path` dentro do router montado em `/api/v1` já terá o prefixo removido pelo Express. Testar com `req.originalUrl` se necessário: `req.originalUrl.includes('/webhooks/')`.
-
-Se `skip` com `req.path` não funcionar no contexto do middleware global (que roda antes do mount do router), usar:
-
-```js
-skip: (req) => req.originalUrl?.includes('/webhooks/'),
-```
-
----
-
-### 5. Garantir Idempotência e Resposta Rápida (< 5 segundos)
-
-**Arquivo:** `src/controllers/webhookController.js`
-
-O controller atual **já responde 200 imediatamente** antes de processar — isso é correto e atende ao requisito de < 5 segundos. Porém, se o processamento async falhar, apenas loga o erro (correto).
-
-**Verificar que o controller continua assim:**
+### `src/controllers/webhookController.js` (sem alteração necessária)
 
 ```js
 import { processarWebhookVenda } from '../services/webhookService.js';
 import logger from '../config/logger.js';
 
 export async function handleBlingVendaWebhook(req, res) {
-  // Responder 200 imediatamente (requisito Bling: < 5s)
+  // Responde 200 imediatamente para o Bling não reenviar
   res.status(200).json({ received: true });
 
-  // Processar de forma assíncrona
   try {
     await processarWebhookVenda(req.body);
   } catch (error) {
@@ -193,86 +254,56 @@ export async function handleBlingVendaWebhook(req, res) {
 }
 ```
 
-**Nota sobre idempotência:** O `webhookService.js` já usa `INSERT IGNORE` para vendas e clientes, e verifica `processada = 0` antes de creditar pontos. Isso garante que webhooks duplicados não creditam pontos duas vezes. **Não é necessário alterar o service.**
+> **Importante:** O `res.status(200)` vem ANTES do processamento.
+> Isso é correto — o Bling espera resposta rápida. Se demorar, ele reenvia o webhook.
 
 ---
 
-### 6. Adicionar `CLIENT_SECRET` ao `.env` (se ainda não existir)
+## Passo 4 — Ajuste no `app.js` (trust proxy)
 
-Garantir que o `.env` tem a variável:
-
-```
-CLIENT_SECRET=seu_client_secret_do_app_bling
-```
-
-Esta variável já é usada pelo `blingAuth.js` para o fluxo OAuth, então provavelmente já existe. O middleware de webhook vai reutilizar a mesma variável.
-
----
-
-## Resumo dos Arquivos Afetados
-
-| Arquivo | Ação |
-|---------|------|
-| `src/middleware/blingSignature.js` | **CRIAR** — middleware de validação HMAC |
-| `src/app.js` | **EDITAR** — adicionar `verify` ao `express.json()` e skip de webhook no rate limiter global |
-| `src/routes/webhookRoutes.js` | **EDITAR** — importar e aplicar `verifyBlingSignature` na rota |
-| `src/controllers/webhookController.js` | **VERIFICAR** — já está correto, opcionalmente adicionar `stack` no log de erro |
-| `.env` | **VERIFICAR** — `CLIENT_SECRET` já deve existir |
-
----
-
-## Checklist de Validação
-
-Após implementar, verificar:
-
-- [ ] O middleware rejeita requisições **sem** o header `X-Bling-Signature-256` (retorna 401).
-- [ ] O middleware rejeita requisições com assinatura **inválida** (retorna 401).
-- [ ] O middleware aceita requisições com assinatura **válida** (retorna 200).
-- [ ] O `rawBody` é um Buffer (não string) — necessário para o HMAC ser consistente.
-- [ ] O rate limiter global não bloqueia IPs do Bling durante retentativas.
-- [ ] A resposta 200 é enviada em < 5 segundos (o processamento é async depois do res.json).
-- [ ] Webhooks duplicados não creditam pontos duas vezes (já garantido pelo INSERT IGNORE + flag `processada`).
-
----
-
-## Script de Teste Manual
-
-Para testar localmente se o middleware funciona, usar este script Node.js:
+Já discutido anteriormente, mas incluído aqui para completude:
 
 ```js
-import { createHmac } from 'node:crypto';
-
-const SECRET = 'seu_client_secret_aqui';
-const payload = JSON.stringify({
-  dados: {
-    id: 123,
-    numero: '1001',
-    data: '2025-01-15',
-    total: 150.00,
-    situacao: { valor: 1 },
-    contato: {
-      id: 456,
-      nome: 'Fulano de Tal',
-      numeroDocumento: '123.456.789-09',
-    },
-  },
-});
-
-const hash = createHmac('sha256', SECRET).update(payload, 'utf-8').digest('hex');
-console.log('Header a enviar:');
-console.log(`X-Bling-Signature-256: sha256=${hash}`);
-console.log('');
-console.log('curl de teste:');
-console.log(`curl -X POST http://localhost:9292/api/v1/webhooks/bling/vendas \\`);
-console.log(`  -H "Content-Type: application/json" \\`);
-console.log(`  -H "X-Bling-Signature-256: sha256=${hash}" \\`);
-console.log(`  -d '${payload}'`);
+const app = express();
+app.set('trust proxy', 1); // ← necessário por causa do ngrok
 ```
 
 ---
 
-## Notas Importantes da Documentação Bling
+## Resumo das Alterações
 
-1. **Retentativas por até 3 dias** — se o endpoint retornar != 2xx ou demorar > 5s, o Bling reenvia. Se continuar falhando, **desabilita o webhook** automaticamente. Por isso é crítico responder 200 rápido.
-2. **Entrega não ordenada** — um webhook de atualização pode chegar antes do de criação. O `INSERT IGNORE` já lida com isso (se a venda já existir, ignora).
-3. **Encoding UTF-8** — o Node.js já usa UTF-8 por padrão para strings, então o HMAC será calculado corretamente.
+| Arquivo | O que muda |
+|---|---|
+| `src/services/routine/blingApi.js` | Exporta `blingFetch`, adiciona `fetchPedidoById` e `fetchContatoById` |
+| `src/services/webhookService.js` | Reescrito: extrai `data` (não `dados`), busca detalhes na API antes de salvar |
+| `src/app.js` | Adiciona `app.set('trust proxy', 1)` |
+
+---
+
+## Fluxo Final (Diagrama)
+
+```
+Bling envia webhook (POST /api/v1/webhooks/bling/vendas)
+  │
+  ├─ blingSignature.js → valida HMAC
+  │
+  ├─ webhookController.js → responde 200 imediatamente
+  │
+  └─ webhookService.js (processamento assíncrono)
+       │
+       ├─ Extrai data.id e data.situacao do payload
+       │
+       ├─ situacao.valor !== 1? → ignora
+       │
+       ├─ GET /pedidos/vendas/{id} → dados completos do pedido
+       │
+       ├─ GET /contatos/{id} → nome e CPF do cliente
+       │
+       ├─ CPF inválido? → ignora
+       │
+       └─ Transação MySQL:
+            ├─ Upsert cliente
+            ├─ Insert venda
+            ├─ Credita pontos
+            └─ Marca venda como processada
+```

@@ -11,7 +11,7 @@ function getTodayIso() {
  * Wrapper genérico para chamadas autenticadas ao Bling.
  * Obtém o token válido antes de cada requisição.
  */
-async function blingFetch(path, options = {}) {
+export async function blingFetch(path, options = {}) {
   const token = await getValidAccessToken();
  
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -40,12 +40,34 @@ async function blingFetch(path, options = {}) {
 export async function fetchPedidosVendas(opts = {}) {
   const today = getTodayIso();
   const params = new URLSearchParams({
-    dataInicial: "2026-04-10" ?? today,
-    dataFinal:   "2026-04-13"   ?? today,
+    dataInicial: opts.dataInicial ?? today,
+    dataFinal:   opts.dataFinal   ?? today,
     limite:      String(opts.limite ?? 10000),
   });
  
   const json = await blingFetch(`/pedidos/vendas?${params}`);
   logger.info('Bling API: pedidos recebidos', { total: json.data?.length ?? 0 });
   return json;
+}
+
+/**
+ * Busca um pedido de venda pelo ID.
+ * @param {number} pedidoId - ID do pedido no Bling
+ * @returns {Promise<Object>} - Dados completos do pedido
+ */
+export async function fetchPedidoById(pedidoId) {
+  const json = await blingFetch(`/pedidos/vendas/${pedidoId}`);
+  logger.info('Bling API: pedido consultado', { pedidoId });
+  return json.data;
+}
+
+/**
+ * Busca um contato pelo ID.
+ * @param {number} contatoId - ID do contato no Bling
+ * @returns {Promise<Object>} - Dados completos do contato
+ */
+export async function fetchContatoById(contatoId) {
+  const json = await blingFetch(`/contatos/${contatoId}`);
+  logger.info('Bling API: contato consultado', { contatoId });
+  return json.data;
 }
