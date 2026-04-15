@@ -1,0 +1,992 @@
+# Guia de Integração — Diboa Cashback × Shopify
+
+> **Contexto:** Você já tem o app `Fidelidade_ian` criado no painel de parceiros do Shopify (dev.shopify.com) e a API Node.js do Diboa Cashback rodando. Este guia cobre tudo o que falta para:
+>
+> 1. Exibir um **botão flutuante** no storefront da Diboa Tabacaria que abre um painel de consulta por CPF
+> 2. Ao clicar em "Resgatar", **criar um cupom de desconto real no Shopify** e mostrá-lo ao cliente
+
+---
+
+## Sumário
+
+1. [Visão geral da arquitetura](#1-visão-geral-da-arquitetura)
+2. [Pré-requisitos](#2-pré-requisitos)
+3. [PARTE A — Configuração do App no Shopify](#3-parte-a--configuração-do-app-no-shopify)
+4. [PARTE B — Alterações na API Node.js (Backend)](#4-parte-b--alterações-na-api-nodejs-backend)
+5. [PARTE C — Theme App Extension (Widget no Storefront)](#5-parte-c--theme-app-extension-widget-no-storefront)
+6. [PARTE D — Deploy e Ativação](#6-parte-d--deploy-e-ativação)
+7. [Tabela de Prêmios (regra de negócio)](#7-tabela-de-prêmios-regra-de-negócio)
+8. [Checklist final](#8-checklist-final)
+9. [Troubleshooting](#9-troubleshooting)
+
+---
+
+## 1. Visão geral da arquitetura
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Storefront Shopify  (diboatabacaria.com.br)            │
+│                                                         │
+│  ┌───────────────────────────────────┐                  │
+│  │ Theme App Extension (widget.js)   │                  │
+│  │  • Botão flutuante "Cashback"     │                  │
+│  │  • Painel lateral com input CPF   │                  │
+│  │  • Lista de prêmios resgatáveis   │                  │
+│  │  • Exibição do cupom gerado       │                  │
+│  └────────────┬──────────────────────┘                  │
+│               │ fetch()                                 │
+└───────────────┼─────────────────────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────────────────┐
+│  API Diboa Cashback  (seu servidor Node.js)           │
+│                                                       │
+│  GET  /api/v1/storefront/consulta/:cpf                │
+│       → retorna pontos + lista de prêmios disponíveis │
+│                                                       │
+│  POST /api/v1/storefront/resgatar                     │
+│       → deduz pontos + cria cupom via Shopify Admin   │
+│         API + retorna código do cupom                 │
+│                                                       │
+│  ┌─────────────────────────────┐                      │
+│  │ Shopify Admin API (REST)    │                      │
+│  │  POST price_rules           │                      │
+│  │  POST discount_codes        │                      │
+│  └─────────────────────────────┘                      │
+└───────────────────────────────────────────────────────┘
+```
+
+O widget no storefront chama a **sua API**, e a sua API é quem conversa com a **Shopify Admin API** para criar cupons. O cliente nunca fala direto com a Admin API.
+
+---
+
+## 2. Pré-requisitos
+
+- Node.js 18+ instalado
+- Shopify CLI instalada (`npm install -g @shopify/cli`)
+- App `Fidelidade_ian` criado no painel de parceiros (✅ já feito)
+- Loja de desenvolvimento ou loja real da Diboa configurada
+- API Diboa Cashback rodando e acessível via HTTPS (necessário para o storefront chamar)
+
+---
+
+## 3. PARTE A — Configuração do App no Shopify
+
+### 3.1 Gerar credenciais da API
+
+1. Acesse `dev.shopify.com/dashboard` → clique no app **Fidelidade_ian**
+2. No menu lateral, vá em **Configurações** → **APIs e acesso**
+3. Copie as credenciais:
+   - **Client ID** (API Key)
+   - **Client Secret** (API Secret Key)
+   - **Admin API access token** (se já instalou o app na loja)
+
+### 3.2 Configurar escopos da API (scopes)
+
+No painel do app, em **Configurações** → **APIs e acesso**, garanta que os seguintes escopos do **Admin API** estão marcados:
+
+| Escopo | Motivo |
+|--------|--------|
+| `write_discounts` | Criar price rules e discount codes |
+| `read_discounts` | Ler cupons existentes (verificar duplicatas) |
+
+Depois de alterar escopos, reinstale o app na loja (Configurações → Instalar app).
+
+### 3.3 Obter o Access Token (Admin API)
+
+Existem duas formas:
+
+**Opção A — App customizado (mais simples para loja própria):**
+
+1. No admin da loja Shopify (`diboatabacaria.myshopify.com/admin`)
+2. Vá em **Configurações** → **Apps e canais de vendas** → **Desenvolver apps**
+3. Se ainda não habilitou, clique em "Permitir desenvolvimento de apps personalizados"
+4. Clique em **Criar um app** → nomeie "Diboa Cashback"
+5. Em **Configurar escopos do Admin API**, marque `write_discounts` e `read_discounts`
+6. Clique em **Instalar app**
+7. Copie o **Admin API access token** (só aparece uma vez!)
+
+**Opção B — Usar o app Fidelidade_ian via OAuth:**
+
+Se preferir usar o app que já criou no painel de parceiros, o fluxo de OAuth gera o token automaticamente ao instalar. Para simplificar (loja própria), a **Opção A** é recomendada.
+
+### 3.4 Adicionar variáveis de ambiente ao `.env`
+
+No `.env` da sua API Node.js, adicione:
+
+```env
+# ── Shopify ──────────────────────────────────────────
+SHOPIFY_STORE_DOMAIN=diboatabacaria.myshopify.com
+SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_xxxxxxxxxxxxxxxxxxxxx
+SHOPIFY_API_VERSION=2025-01
+```
+
+> **Importante:** O `SHOPIFY_ADMIN_ACCESS_TOKEN` começa com `shpat_`. Guarde-o em segurança.
+
+---
+
+## 4. PARTE B — Alterações na API Node.js (Backend)
+
+### 4.1 Instalar dependência (opcional, mas recomendada)
+
+```bash
+npm install nanoid
+```
+
+`nanoid` será usada para gerar códigos de cupom únicos. Se preferir não instalar, pode usar `crypto.randomUUID()` nativo.
+
+### 4.2 Definir a tabela de prêmios
+
+Crie o arquivo `src/config/premios.js`:
+
+```js
+// src/config/premios.js
+
+/**
+ * Tabela de prêmios do programa de cashback.
+ * Cada prêmio define quantos pontos custa e qual desconto gera no Shopify.
+ *
+ * - pontos: custo em pontos
+ * - valor: valor do desconto em R$ (BRL)
+ * - titulo: nome exibido ao cliente
+ */
+const PREMIOS = [
+  { id: 1,  pontos: 100,  valor: 7.00,   titulo: 'Cashback de R$ 7 na próxima compra' },
+  { id: 2,  pontos: 150,  valor: 10.50,  titulo: 'Cashback de R$ 10,50 na próxima compra' },
+  { id: 3,  pontos: 200,  valor: 15.00,  titulo: 'Cashback de R$ 15 na próxima compra' },
+  { id: 4,  pontos: 300,  valor: 25.00,  titulo: 'Cashback de R$ 25 na próxima compra' },
+  { id: 5,  pontos: 500,  valor: 50.00,  titulo: 'Cashback de R$ 50 na próxima compra' },
+  // Adicione/remova conforme sua regra de negócio
+];
+
+export default PREMIOS;
+```
+
+> **Ajuste os valores** conforme a tabela real que você já usa (a screenshot mostra 21 prêmios — adicione todos aqui).
+
+### 4.3 Criar o serviço Shopify
+
+Crie o arquivo `src/services/shopifyService.js`:
+
+```js
+// src/services/shopifyService.js
+import logger from '../config/logger.js';
+
+const SHOPIFY_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
+const ACCESS_TOKEN    = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+const API_VERSION     = process.env.SHOPIFY_API_VERSION || '2025-01';
+
+const BASE_URL = `https://${SHOPIFY_DOMAIN}/admin/api/${API_VERSION}`;
+
+/**
+ * Cria um cupom de desconto fixo no Shopify.
+ *
+ * Fluxo: cria uma Price Rule → cria um Discount Code vinculado a ela.
+ *
+ * @param {object} params
+ * @param {string} params.codigo   - Código do cupom (ex: "DIBOA-A3F8K2")
+ * @param {number} params.valor    - Valor do desconto em R$ (ex: 7.00)
+ * @param {string} params.titulo   - Título legível (ex: "Cashback de R$ 7")
+ * @returns {Promise<{ codigo: string, priceRuleId: number }>}
+ */
+export async function criarCupomDesconto({ codigo, valor, titulo }) {
+  // ── 1. Criar Price Rule ────────────────────────────────────
+  const agora = new Date().toISOString();
+  const expira = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 dias
+
+  const priceRuleBody = {
+    price_rule: {
+      title: titulo,
+      target_type: 'line_item',            // desconto aplicado nos itens
+      target_selection: 'all',             // todos os produtos
+      allocation_method: 'across',         // distribui entre os itens
+      value_type: 'fixed_amount',          // valor fixo em R$
+      value: `-${valor.toFixed(2)}`,       // Shopify espera negativo
+      customer_selection: 'all',           // qualquer cliente pode usar
+      usage_limit: 1,                      // uso único
+      once_per_customer: true,
+      starts_at: agora,
+      ends_at: expira,
+    },
+  };
+
+  const priceRuleRes = await fetch(`${BASE_URL}/price_rules.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': ACCESS_TOKEN,
+    },
+    body: JSON.stringify(priceRuleBody),
+  });
+
+  if (!priceRuleRes.ok) {
+    const err = await priceRuleRes.text();
+    logger.error('Shopify: erro ao criar price rule', { status: priceRuleRes.status, body: err });
+    throw new Error(`Falha ao criar regra de desconto no Shopify: ${priceRuleRes.status}`);
+  }
+
+  const { price_rule } = await priceRuleRes.json();
+  logger.info('Shopify: price rule criada', { id: price_rule.id, titulo });
+
+  // ── 2. Criar Discount Code vinculado ──────────────────────
+  const discountBody = {
+    discount_code: {
+      code: codigo,
+    },
+  };
+
+  const discountRes = await fetch(
+    `${BASE_URL}/price_rules/${price_rule.id}/discount_codes.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': ACCESS_TOKEN,
+      },
+      body: JSON.stringify(discountBody),
+    }
+  );
+
+  if (!discountRes.ok) {
+    const err = await discountRes.text();
+    logger.error('Shopify: erro ao criar discount code', { status: discountRes.status, body: err });
+    throw new Error(`Falha ao criar código de desconto no Shopify: ${discountRes.status}`);
+  }
+
+  const { discount_code } = await discountRes.json();
+  logger.info('Shopify: cupom criado', { code: discount_code.code, priceRuleId: price_rule.id });
+
+  return {
+    codigo: discount_code.code,
+    priceRuleId: price_rule.id,
+  };
+}
+```
+
+### 4.4 Criar o serviço de resgate para o storefront
+
+Crie o arquivo `src/services/storefrontResgateService.js`:
+
+```js
+// src/services/storefrontResgateService.js
+import crypto from 'node:crypto';
+import pool from '../config/db.js';
+import * as clienteRepo from '../repository/clienteRepository.js';
+import { validateCpf } from '../validators/index.js';
+import { NotFoundError, InsufficientBalanceError, BadRequestError } from '../errors/AppError.js';
+import { criarCupomDesconto } from './shopifyService.js';
+import PREMIOS from '../config/premios.js';
+import logger from '../config/logger.js';
+
+/**
+ * Consulta pontos e prêmios disponíveis para um CPF.
+ */
+export async function consultarPontos(rawCpf) {
+  const cpf = validateCpf(rawCpf);
+  const cliente = await clienteRepo.findByCpf(cpf);
+  if (!cliente) throw new NotFoundError('CPF não encontrado no programa de cashback');
+
+  const pontosDisponiveis = Number(cliente.pontos);
+
+  const premiosDisponiveis = PREMIOS
+    .filter(p => pontosDisponiveis >= p.pontos)
+    .map(p => ({
+      id: p.id,
+      titulo: p.titulo,
+      pontos: p.pontos,
+      valor: p.valor,
+    }));
+
+  return {
+    nome: cliente.nome.split(' ')[0],        // só o primeiro nome (privacidade)
+    pontos: pontosDisponiveis,
+    premios: premiosDisponiveis,
+    totalPremios: PREMIOS.length,
+  };
+}
+
+/**
+ * Resgata um prêmio: deduz pontos + cria cupom no Shopify.
+ */
+export async function resgatarPremio(rawCpf, premioId) {
+  const cpf = validateCpf(rawCpf);
+
+  // Validar prêmio
+  const premio = PREMIOS.find(p => p.id === premioId);
+  if (!premio) throw new BadRequestError('Prêmio inválido');
+
+  // Gerar código único para o cupom
+  const sufixo = crypto.randomBytes(4).toString('hex').toUpperCase();
+  const codigoCupom = `DIBOA-${sufixo}`;
+
+  // Transação: verificar saldo → deduzir pontos → registrar resgate
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const cliente = await clienteRepo.findByCpfForUpdate(conn, cpf);
+    if (!cliente) throw new NotFoundError('CPF não encontrado');
+    if (cliente.pontos < premio.pontos) {
+      throw new InsufficientBalanceError(
+        `Saldo insuficiente. Disponível: ${cliente.pontos}, necessário: ${premio.pontos}`
+      );
+    }
+
+    // Deduzir pontos
+    await clienteRepo.deductPontos(conn, cliente.id, premio.pontos);
+
+    // Registrar no histórico
+    await clienteRepo.insertResgate(conn, cliente.client_id, premio.pontos);
+
+    // Criar cupom no Shopify (fora da transação do banco seria ideal,
+    // mas para simplicidade, fazemos aqui e revertemos se falhar)
+    let cupom;
+    try {
+      cupom = await criarCupomDesconto({
+        codigo: codigoCupom,
+        valor: premio.valor,
+        titulo: `${premio.titulo} — Resgate cashback`,
+      });
+    } catch (shopifyErr) {
+      logger.error('Erro ao criar cupom no Shopify, revertendo transação', {
+        error: shopifyErr.message,
+      });
+      throw shopifyErr; // vai cair no rollback
+    }
+
+    await conn.commit();
+
+    logger.info('Resgate storefront concluído', {
+      cpf: cpf.slice(0, 3) + '***',
+      premioId,
+      cupom: cupom.codigo,
+    });
+
+    return {
+      cupom: cupom.codigo,
+      valor: premio.valor,
+      mensagem: `Use o cupom ${cupom.codigo} na finalização da compra. Validade: 30 dias.`,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+```
+
+### 4.5 Criar o controller do storefront
+
+Crie o arquivo `src/controllers/storefrontController.js`:
+
+```js
+// src/controllers/storefrontController.js
+import * as storefrontService from '../services/storefrontResgateService.js';
+
+export async function consultarCpf(req, res, next) {
+  try {
+    const resultado = await storefrontService.consultarPontos(req.params.cpf);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resgatarPremio(req, res, next) {
+  try {
+    const { cpf, premioId } = req.body;
+    const resultado = await storefrontService.resgatarPremio(cpf, premioId);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+}
+```
+
+### 4.6 Criar as rotas do storefront
+
+Crie o arquivo `src/routes/storefrontRoutes.js`:
+
+```js
+// src/routes/storefrontRoutes.js
+import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import { consultarCpf, resgatarPremio } from '../controllers/storefrontController.js';
+
+const router = Router();
+
+// Rate limit mais restrito para rotas públicas do storefront
+const storefrontLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 min
+  max: 30,                      // 30 requisições por IP
+  message: { error: { code: 'RATE_LIMIT', message: 'Muitas tentativas. Aguarde alguns minutos.' } },
+});
+
+router.use(storefrontLimiter);
+
+router.get('/storefront/consulta/:cpf', consultarCpf);
+router.post('/storefront/resgatar', resgatarPremio);
+
+export default router;
+```
+
+### 4.7 Registrar as rotas no app.js
+
+No `src/app.js`, adicione a importação e o `app.use`:
+
+```js
+// Adicionar no topo, junto dos outros imports:
+import storefrontRoutes from './routes/storefrontRoutes.js';
+
+// Adicionar junto das outras rotas (após as existentes):
+app.use('/api/v1', storefrontRoutes);
+```
+
+### 4.8 Configurar CORS para o storefront
+
+No `src/app.js`, atualize a configuração de CORS para aceitar chamadas do seu domínio Shopify:
+
+```js
+// Substituir a linha existente de cors por:
+app.use(cors({
+  origin: [
+    process.env.CORS_ORIGIN || '*',
+    'https://diboatabacaria.com.br',
+    'https://www.diboatabacaria.com.br',
+    /\.myshopify\.com$/,
+  ],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+```
+
+### 4.9 Resumo dos novos endpoints
+
+| Método | Rota | Descrição | Body |
+|--------|------|-----------|------|
+| `GET` | `/api/v1/storefront/consulta/:cpf` | Consulta pontos e prêmios disponíveis | — |
+| `POST` | `/api/v1/storefront/resgatar` | Resgata prêmio e gera cupom Shopify | `{ "cpf": "12345678900", "premioId": 1 }` |
+
+**Exemplo de resposta do GET `/consulta/:cpf`:**
+```json
+{
+  "nome": "João",
+  "pontos": 350,
+  "premios": [
+    { "id": 1, "titulo": "Cashback de R$ 7 na próxima compra", "pontos": 100, "valor": 7.0 },
+    { "id": 2, "titulo": "Cashback de R$ 10,50 na próxima compra", "pontos": 150, "valor": 10.5 },
+    { "id": 3, "titulo": "Cashback de R$ 15 na próxima compra", "pontos": 200, "valor": 15.0 },
+    { "id": 4, "titulo": "Cashback de R$ 25 na próxima compra", "pontos": 300, "valor": 25.0 }
+  ],
+  "totalPremios": 5
+}
+```
+
+**Exemplo de resposta do POST `/resgatar`:**
+```json
+{
+  "cupom": "DIBOA-A3F8K2E1",
+  "valor": 7.0,
+  "mensagem": "Use o cupom DIBOA-A3F8K2E1 na finalização da compra. Validade: 30 dias."
+}
+```
+
+---
+
+## 5. PARTE C — Theme App Extension (Widget no Storefront)
+
+A Theme App Extension é o mecanismo oficial do Shopify para injetar código no storefront de lojas sem editar o tema diretamente. Ela é versionada, aprovável, e não quebra o tema do lojista.
+
+### 5.1 Inicializar a estrutura do app Shopify (se ainda não fez)
+
+Na pasta do seu projeto (ou em uma pasta separada para o app Shopify):
+
+```bash
+mkdir shopify-app-diboa && cd shopify-app-diboa
+shopify app init
+```
+
+Durante o init, selecione:
+- Vincule ao app existente **Fidelidade_ian** (ou use o Client ID para vincular)
+
+Se você já tem a estrutura criada pela Shopify CLI, vá para o passo 5.2.
+
+### 5.2 Criar a Theme App Extension
+
+```bash
+shopify app generate extension --template theme_app_extension --name diboa-cashback-widget
+```
+
+Isso vai criar a estrutura:
+
+```
+extensions/
+└── diboa-cashback-widget/
+    ├── assets/
+    ├── blocks/
+    ├── snippets/
+    └── shopify.extension.toml
+```
+
+### 5.3 Criar o bloco do widget
+
+Crie o arquivo `extensions/diboa-cashback-widget/blocks/cashback-widget.liquid`:
+
+```liquid
+{% comment %}
+  Diboa Cashback — Widget flutuante de consulta e resgate
+  Inserido via Theme App Extension
+{% endcomment %}
+
+{%- assign api_url = block.settings.api_url -%}
+{%- assign cor_primaria = block.settings.cor_primaria -%}
+{%- assign cor_secundaria = block.settings.cor_secundaria -%}
+
+<!-- Botão Flutuante -->
+<div id="diboa-fab" style="
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 9999;
+  cursor: pointer;
+  background: {{ cor_primaria }};
+  color: #fff;
+  border-radius: 50px;
+  padding: 14px 22px;
+  font-family: sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s;
+" onclick="diboaTogglePainel()">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 6v6l4 2"/>
+  </svg>
+  CASHBACK
+</div>
+
+<!-- Painel Lateral -->
+<div id="diboa-painel" style="
+  position: fixed;
+  top: 0; left: 0;
+  width: 380px;
+  max-width: 100vw;
+  height: 100vh;
+  background: #fff;
+  z-index: 10000;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  font-family: sans-serif;
+  overflow-y: auto;
+">
+  <!-- Header -->
+  <div style="background: {{ cor_primaria }}; color: #fff; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <strong style="font-size: 18px;">DIBOA CASHBACK</strong>
+    </div>
+    <button onclick="diboaTogglePainel()" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;">&times;</button>
+  </div>
+
+  <!-- Conteúdo -->
+  <div style="padding: 20px; flex: 1;" id="diboa-conteudo">
+    <!-- Toggle Cupons / Produtos (visual) -->
+    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:{{ cor_primaria }};display:inline-block;"></span>
+        Cupons
+      </span>
+    </div>
+
+    <!-- Input CPF -->
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <input
+        type="text"
+        id="diboa-cpf-input"
+        placeholder="Digite seu CPF"
+        maxlength="14"
+        style="flex:1;padding:10px 14px;border:1px solid #ccc;border-radius:6px;font-size:15px;"
+        oninput="diboaFormatarCpf(this)"
+        onkeydown="if(event.key==='Enter')diboaConsultar()"
+      />
+      <button
+        onclick="diboaConsultar()"
+        style="background:{{ cor_primaria }};color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:16px;"
+      >🔍</button>
+    </div>
+
+    <!-- Área de resultados -->
+    <div id="diboa-resultado"></div>
+  </div>
+
+  <!-- Footer -->
+  <div style="padding: 10px 20px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee;">
+    desenvolvido por Diboa Tabacaria
+  </div>
+</div>
+
+<!-- Overlay -->
+<div id="diboa-overlay" style="
+  position: fixed; top:0; left:0; width:100vw; height:100vh;
+  background: rgba(0,0,0,0.4);
+  z-index: 9999;
+  display: none;
+" onclick="diboaTogglePainel()"></div>
+
+<script>
+(function() {
+  const API_URL = '{{ api_url }}';
+  let painelAberto = false;
+  let cpfAtual = '';
+
+  // ── Toggle do painel ────────────────────────────────
+  window.diboaTogglePainel = function() {
+    painelAberto = !painelAberto;
+    const painel = document.getElementById('diboa-painel');
+    const overlay = document.getElementById('diboa-overlay');
+    painel.style.transform = painelAberto ? 'translateX(0)' : 'translateX(-100%)';
+    overlay.style.display = painelAberto ? 'block' : 'none';
+  };
+
+  // ── Formatar CPF ─────────────────────────────────────
+  window.diboaFormatarCpf = function(el) {
+    let v = el.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.slice(0, 11);
+    if (v.length > 9) v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6,9) + '-' + v.slice(9);
+    else if (v.length > 6) v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6);
+    else if (v.length > 3) v = v.slice(0,3) + '.' + v.slice(3);
+    el.value = v;
+  };
+
+  // ── Consultar CPF ────────────────────────────────────
+  window.diboaConsultar = async function() {
+    const input = document.getElementById('diboa-cpf-input');
+    const resultado = document.getElementById('diboa-resultado');
+    const cpf = input.value.replace(/\D/g, '');
+
+    if (cpf.length !== 11) {
+      resultado.innerHTML = '<p style="color:red;font-size:14px;">CPF inválido. Digite 11 dígitos.</p>';
+      return;
+    }
+
+    cpfAtual = cpf;
+    resultado.innerHTML = '<p style="color:#666;font-size:14px;">Consultando...</p>';
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/storefront/consulta/${cpf}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        resultado.innerHTML = `<p style="color:red;font-size:14px;">${data.error?.message || 'CPF não encontrado.'}</p>`;
+        return;
+      }
+
+      let html = `
+        <div style="background:#f8f8f8;border-radius:8px;padding:14px;margin-bottom:16px;">
+          <p style="margin:0;font-size:15px;">Olá, <strong>${data.nome}</strong>!</p>
+          <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#333;">
+            ${data.pontos} <span style="font-size:13px;color:#666;">pontos</span>
+          </p>
+        </div>
+        <h3 style="margin:0 0 12px;font-size:16px;">Prêmios <span style="font-weight:400;font-size:13px;color:#999;">total de ${data.totalPremios} prêmios</span></h3>
+      `;
+
+      if (data.premios.length === 0) {
+        html += '<p style="font-size:14px;color:#999;">Nenhum prêmio disponível para seu saldo atual.</p>';
+      } else {
+        data.premios.forEach(p => {
+          html += `
+            <div style="border:1px solid #e0e0e0;border-radius:8px;padding:14px;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <p style="margin:0;font-size:14px;font-weight:600;">${p.titulo}</p>
+                  <p style="margin:4px 0 0;font-size:14px;color:{{ cor_primaria }};font-weight:700;">${p.pontos} PONTOS</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button onclick="diboaResgatar(${p.id}, '${p.titulo}')" style="
+                  flex:1;background:{{ cor_primaria }};color:#fff;border:none;border-radius:6px;
+                  padding:10px;cursor:pointer;font-size:14px;font-weight:600;
+                ">🎁 Resgatar</button>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      resultado.innerHTML = html;
+    } catch (err) {
+      resultado.innerHTML = '<p style="color:red;font-size:14px;">Erro de conexão. Tente novamente.</p>';
+    }
+  };
+
+  // ── Resgatar Prêmio ──────────────────────────────────
+  window.diboaResgatar = async function(premioId, titulo) {
+    if (!confirm(`Deseja resgatar: ${titulo}?`)) return;
+
+    const resultado = document.getElementById('diboa-resultado');
+    resultado.innerHTML = '<p style="color:#666;font-size:14px;">Gerando seu cupom...</p>';
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/storefront/resgatar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cpf: cpfAtual, premioId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        resultado.innerHTML = `<p style="color:red;font-size:14px;">${data.error?.message || 'Erro ao resgatar.'}</p>`;
+        return;
+      }
+
+      resultado.innerHTML = `
+        <div style="text-align:center;padding:20px 0;">
+          <div style="font-size:48px;margin-bottom:10px;">🎉</div>
+          <h3 style="margin:0 0 10px;color:#333;">Cupom gerado com sucesso!</h3>
+          <div style="
+            background:#f0faf0;border:2px dashed #2ecc71;border-radius:10px;
+            padding:16px;margin:16px 0;
+          ">
+            <p style="margin:0 0 4px;font-size:12px;color:#999;">Seu código de desconto:</p>
+            <p style="margin:0;font-size:24px;font-weight:800;color:#333;letter-spacing:2px;">${data.cupom}</p>
+            <p style="margin:8px 0 0;font-size:14px;color:#666;">Desconto de R$ ${data.valor.toFixed(2)}</p>
+          </div>
+          <p style="font-size:13px;color:#666;">${data.mensagem}</p>
+          <button onclick="navigator.clipboard.writeText('${data.cupom}');this.textContent='Copiado ✓'" style="
+            margin-top:12px;background:#333;color:#fff;border:none;border-radius:6px;
+            padding:10px 24px;cursor:pointer;font-size:14px;
+          ">📋 Copiar cupom</button>
+          <br/>
+          <button onclick="diboaConsultar()" style="
+            margin-top:10px;background:none;border:1px solid #ccc;border-radius:6px;
+            padding:8px 20px;cursor:pointer;font-size:13px;color:#666;
+          ">← Voltar aos prêmios</button>
+        </div>
+      `;
+    } catch (err) {
+      resultado.innerHTML = '<p style="color:red;font-size:14px;">Erro de conexão. Tente novamente.</p>';
+    }
+  };
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Diboa Cashback",
+  "target": "body",
+  "javascript": "",
+  "stylesheet": "",
+  "settings": [
+    {
+      "type": "text",
+      "id": "api_url",
+      "label": "URL da API Diboa",
+      "default": "https://sua-api.com",
+      "info": "URL base da sua API (sem barra final). Ex: https://api.diboatabacaria.com.br"
+    },
+    {
+      "type": "color",
+      "id": "cor_primaria",
+      "label": "Cor primária",
+      "default": "#1a472a"
+    },
+    {
+      "type": "color",
+      "id": "cor_secundaria",
+      "label": "Cor secundária",
+      "default": "#c8a951"
+    }
+  ]
+}
+{% endschema %}
+```
+
+### 5.4 Configurar o `shopify.extension.toml`
+
+Verifique que o arquivo `extensions/diboa-cashback-widget/shopify.extension.toml` contém:
+
+```toml
+api_version = "2025-01"
+
+[[extensions]]
+type = "theme"
+name = "Diboa Cashback Widget"
+
+  [extensions.capabilities]
+  block_app_embed = true
+```
+
+A propriedade `block_app_embed` permite que o bloco seja adicionado como "App Embed" no editor de tema, sem precisar editar templates específicos.
+
+### 5.5 Deploy da extensão
+
+```bash
+# Na raiz do projeto Shopify app:
+shopify app deploy
+```
+
+Isso fará upload da extensão para o Shopify. Aceite o prompt de confirmação.
+
+### 5.6 Ativar o widget no tema
+
+1. No admin da loja, vá em **Canais de vendas** → **Loja virtual** → **Personalizar** (botão no tema ativo)
+2. No editor de tema, clique em **App embeds** (ícone de bloquinhos no menu lateral esquerdo)
+3. Encontre **Diboa Cashback** e **ative o toggle**
+4. Configure a **URL da API** (ex: `https://api.diboatabacaria.com.br`)
+5. Ajuste as cores se necessário
+6. Clique em **Salvar**
+
+---
+
+## 6. PARTE D — Deploy e Ativação
+
+### 6.1 Checklist de deploy do backend
+
+1. Adicione as 3 variáveis novas ao `.env` de produção:
+   ```
+   SHOPIFY_STORE_DOMAIN=diboatabacaria.myshopify.com
+   SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_xxxxx
+   SHOPIFY_API_VERSION=2025-01
+   ```
+
+2. Crie os novos arquivos:
+   ```
+   src/config/premios.js
+   src/services/shopifyService.js
+   src/services/storefrontResgateService.js
+   src/controllers/storefrontController.js
+   src/routes/storefrontRoutes.js
+   ```
+
+3. Modifique os arquivos existentes:
+   ```
+   src/app.js  (import storefrontRoutes + CORS atualizado)
+   ```
+
+4. Reinicie o servidor:
+   ```bash
+   npm start
+   ```
+
+5. Teste os endpoints:
+   ```bash
+   # Consulta
+   curl https://sua-api.com/api/v1/storefront/consulta/12345678900
+
+   # Resgate
+   curl -X POST https://sua-api.com/api/v1/storefront/resgatar \
+     -H "Content-Type: application/json" \
+     -d '{"cpf": "12345678900", "premioId": 1}'
+   ```
+
+### 6.2 Checklist de deploy do Shopify
+
+1. `shopify app deploy` para enviar a extensão
+2. Ativar o App Embed no editor de tema
+3. Configurar a URL da API nas settings do bloco
+4. Testar no storefront real
+
+### 6.3 Teste completo (fluxo ponta a ponta)
+
+1. Acesse a loja `diboatabacaria.com.br`
+2. Veja o botão flutuante "CASHBACK" no canto inferior esquerdo
+3. Clique → abre o painel lateral
+4. Digite um CPF de teste → clique na lupa
+5. Veja os prêmios disponíveis
+6. Clique em "Resgatar" em um prêmio
+7. Confirme na janela de diálogo
+8. Veja o cupom gerado (ex: `DIBOA-A3F8K2E1`)
+9. Copie o cupom e use no checkout da loja para validar que o desconto é aplicado
+
+---
+
+## 7. Tabela de Prêmios (regra de negócio)
+
+A tabela de prêmios fica em `src/config/premios.js`. Pela screenshot, a loja atual tem 21 prêmios. Aqui está o template — **preencha todos os 21 com os valores reais**:
+
+```js
+const PREMIOS = [
+  { id: 1,  pontos: 100,  valor: 7.00,    titulo: 'Cashback de R$ 7 na próxima compra' },
+  { id: 2,  pontos: 150,  valor: 10.50,   titulo: 'Cashback de R$ 10,50 na próxima compra' },
+  // ... adicione os 19 restantes com os valores corretos
+];
+```
+
+Cada cupom gerado pelo Shopify:
+- Tem **uso único** (`usage_limit: 1`)
+- É válido por **30 dias** (configurável no `shopifyService.js`)
+- Aplica desconto de **valor fixo** em toda a compra
+- Aceita **qualquer cliente** (não vincula ao customer do Shopify)
+
+---
+
+## 8. Checklist final
+
+### Backend (API Node.js)
+- [ ] Variáveis `SHOPIFY_*` no `.env`
+- [ ] Arquivo `src/config/premios.js` criado com todos os 21 prêmios
+- [ ] Arquivo `src/services/shopifyService.js` criado
+- [ ] Arquivo `src/services/storefrontResgateService.js` criado
+- [ ] Arquivo `src/controllers/storefrontController.js` criado
+- [ ] Arquivo `src/routes/storefrontRoutes.js` criado
+- [ ] `src/app.js` atualizado (import + CORS)
+- [ ] API acessível via HTTPS (obrigatório para o storefront chamar)
+- [ ] Endpoints testados com cURL
+
+### Shopify
+- [ ] Admin API access token gerado com escopos `write_discounts` + `read_discounts`
+- [ ] Theme App Extension criada e deployada (`shopify app deploy`)
+- [ ] App Embed ativado no editor de tema
+- [ ] URL da API configurada nas settings do bloco
+- [ ] Widget testado no storefront (consulta + resgate + uso do cupom no checkout)
+
+---
+
+## 9. Troubleshooting
+
+| Problema | Causa provável | Solução |
+|----------|---------------|---------|
+| Widget não aparece na loja | App Embed desativado | Vá no editor de tema → App embeds → ative |
+| "Erro de conexão" no widget | CORS bloqueando | Verifique o CORS no `app.js` e que a API usa HTTPS |
+| "Falha ao criar regra de desconto" | Token sem escopo | Regenere o token com `write_discounts` |
+| Cupom criado mas não funciona no checkout | Price Rule expirada ou valor errado | Verifique no admin Shopify → Descontos |
+| "CPF não encontrado" | Cliente não existe no banco | O cliente precisa ter comprado algo (registrado via webhook/rotina) |
+| Rate limit atingido | Muitas consultas | Ajuste o `max` no `storefrontLimiter` |
+| `shpat_` token inválido | Token copiado errado ou app reinstalado | Regenere o token no admin → Apps → Desenvolver apps |
+
+---
+
+## Estrutura final de arquivos (novos / modificados)
+
+```
+src/
+├── app.js                             ← MODIFICADO (import + CORS)
+├── config/
+│   ├── premios.js                     ← NOVO
+│   └── ...
+├── controllers/
+│   ├── storefrontController.js        ← NOVO
+│   └── ...
+├── routes/
+│   ├── storefrontRoutes.js            ← NOVO
+│   └── ...
+├── services/
+│   ├── shopifyService.js              ← NOVO
+│   ├── storefrontResgateService.js    ← NOVO
+│   └── ...
+.env                                   ← MODIFICADO (+ 3 variáveis Shopify)
+
+extensions/                            ← PROJETO SHOPIFY APP (separado ou junto)
+└── diboa-cashback-widget/
+    ├── blocks/
+    │   └── cashback-widget.liquid     ← NOVO (widget completo)
+    └── shopify.extension.toml         ← NOVO (config da extensão)
+```

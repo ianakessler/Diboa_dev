@@ -41,6 +41,21 @@ app.use('/api/v1', resgateRoutes);
 app.use('/api/v1', authRoutes);
 app.use('/api/v1', webhookRoutes);
 
+// ── check bling signature ────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  if (req.path.includes('webhooks') && !req.path.startsWith('/api/v1')) {
+    logger.warn('Webhook em path incorreto', {
+      path: req.originalUrl,
+      ip: req.ip,
+      headers: {
+        'x-bling-signature-256': req.headers['x-bling-signature-256'] ?? 'AUSENTE',
+        'user-agent': req.headers['user-agent'],
+      },
+    });
+  }
+  next();
+});
+
 // ── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Rota não encontrada' } });
@@ -55,7 +70,7 @@ const server = app.listen(PORT, () => {
 });
 
 // ── Cron: rotina diária de sincronização (23:59) ─────────────────────────────
-cron.schedule('34 23 * * *', async () => {
+cron.schedule('55 23 * * *', async () => {
   logger.info('Cron: iniciando rotina diaria de sincronizacao');
   try {
     const result = await executarRotina();
