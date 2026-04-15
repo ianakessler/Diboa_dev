@@ -4,8 +4,18 @@ import pool from '../config/db.js';
  * @typedef {Object} Cliente
  * @property {number} id
  * @property {string} nome
- * @property {string} cpf
+ * @property {string} numero_documento
+ * @property {number} client_id
  * @property {number} pontos
+ * @property {string} email
+ * @property {string} telefone
+ * @property {string} endereco
+ * @property {string} numero
+ * @property {string} complemento
+ * @property {string} bairro
+ * @property {string} cidade
+ * @property {string} estado
+ * @property {string} cep
  */
 
 /**
@@ -14,7 +24,7 @@ import pool from '../config/db.js';
  */
 export async function findAll() {
   const [rows] = await pool.query(
-    'SELECT id, nome, numero_documento, pontos FROM clientes ORDER BY nome ASC'
+    'SELECT id, nome, numero_documento, pontos, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep FROM clientes ORDER BY nome ASC'
   );
   return rows;
 }
@@ -26,7 +36,7 @@ export async function findAll() {
 */
 export async function findByCpf(cpf) {
   const [rows] = await pool.query(
-    'SELECT id, nome, numero_documento, client_id, pontos FROM clientes WHERE numero_documento = ? LIMIT 1',
+    'SELECT id, nome, numero_documento, client_id, pontos, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep FROM clientes WHERE numero_documento = ? LIMIT 1',
     [cpf]
   );
   return rows[0] ?? null;
@@ -37,10 +47,11 @@ export async function findByCpf(cpf) {
  * @param {import('mysql2/promise').PoolConnection} conn
  * @param {{ nome: string, cpf: string, clienteId: number }} data
  */
-export async function upsertIgnore(conn, { nome, cpf, clienteId }) {
+export async function upsertIgnore(conn, { nome, cpf, clienteId, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep }) {
   await conn.query(
-    'INSERT IGNORE INTO clientes (nome, numero_documento, client_id) VALUES (?, ?, ?)',
-    [nome, cpf, clienteId]
+    `INSERT IGNORE INTO clientes (nome, numero_documento, client_id, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [nome, cpf, clienteId, email ?? null, telefone ?? null, endereco ?? null, numero ?? null, complemento ?? null, bairro ?? null, cidade ?? null, estado ?? null, cep ?? null]
   );
 }
 
@@ -75,11 +86,13 @@ export async function findByCpfForUpdate(conn, cpf) {
 /**
  * Update a client
  */
-export async function updateClient(conn, cpf, pontos, nome, id) {
+export async function updateClient(conn, { id, cpf, pontos, nome, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep }) {
     await conn.query(
-      `UPDATE clientes SET pontos = ?, numero_documento = ?,
-      nome = ? WHERE id = ?`,
-      [pontos, cpf, nome, id]
+      `UPDATE clientes SET pontos = ?, numero_documento = ?, nome = ?,
+       email = ?, telefone = ?, endereco = ?, numero = ?, complemento = ?,
+       bairro = ?, cidade = ?, estado = ?, cep = ?
+       WHERE id = ?`,
+      [pontos, cpf, nome, email ?? null, telefone ?? null, endereco ?? null, numero ?? null, complemento ?? null, bairro ?? null, cidade ?? null, estado ?? null, cep ?? null, id]
     );
 } 
 

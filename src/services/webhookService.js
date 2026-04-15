@@ -38,13 +38,12 @@ export async function processarWebhookVenda(body) {
   const doc = contato.numeroDocumento?.replace(/\D/g, '');
   if (!doc || !cpfValidator.isValid(doc)) {
     logger.info('Webhook ignorado: CPF inválido ou ausente', {
-      pedidoId: pedido.id,
       contatoId: contato.id,
     });
     return;
   }
 
-  console.log(contato);
+  const enderecoGeral = contato.endereco?.geral ?? {};
 
   // 7. Salvar no banco (transação)
   const conn = await pool.getConnection();
@@ -55,6 +54,15 @@ export async function processarWebhookVenda(body) {
       nome: contato.nome,
       cpf: doc,
       clienteId: contato.id,
+      email: contato.email ?? null,
+      telefone: contato.telefone || contato.celular || null,
+      endereco: enderecoGeral.endereco ?? null,
+      numero: enderecoGeral.numero ?? null,
+      complemento: enderecoGeral.complemento ?? null,
+      bairro: enderecoGeral.bairro ?? null,
+      cidade: enderecoGeral.municipio ?? null,
+      estado: enderecoGeral.uf ?? null,
+      cep: enderecoGeral.cep ?? null,
     });
 
     await vendaRepo.batchInsertIgnore(conn, [[
@@ -80,8 +88,7 @@ export async function processarWebhookVenda(body) {
 
     await conn.commit();
     logger.info('Webhook processado com sucesso', {
-      pedidoId: pedido.id,
-      cpf: doc,
+      nome_cliente: contato.nome,
       total: pedido.total,
     });
   } catch (err) {

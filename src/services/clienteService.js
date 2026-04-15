@@ -29,7 +29,7 @@ export async function getByCpf(rawCpf) {
  * @param {number} pontos
  * @param {string} nome
  */
-export async function editByCpf(rawCpf, pontos, nome) {
+export async function editByCpf(rawCpf, { pontos, nome, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep } = {}) {
 
   const cpf = validateCpf(rawCpf);
   const conn = await pool.getConnection();
@@ -41,7 +41,7 @@ export async function editByCpf(rawCpf, pontos, nome) {
       await conn.rollback();
       throw new NotFoundError('Cliente não encontrado');
     }
-    await clienteRepo.updateClient(conn, cpf, pontos, nome, cliente.id);
+    await clienteRepo.updateClient(conn, { id: cliente.id, cpf, pontos, nome, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep });
     await conn.commit();
   } catch (error) {
     await conn.rollback();

@@ -21,8 +21,8 @@ export async function getClientByCpf(req, res, next) {
 export async function editClient(req, res, next) {
   try {
     const cpf = req.params.cpf;
-    const { pontos, nome } = req.body;
-    await clienteService.editByCpf(cpf, pontos, nome);
+    const { pontos, nome, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep } = req.body;
+    await clienteService.editByCpf(cpf, { pontos, nome, email, telefone, endereco, numero, complemento, bairro, cidade, estado, cep });
     return res.status(200).json({res: "Cliente atualizado"});
   } catch (error) {
     next(error);
