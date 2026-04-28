@@ -42,7 +42,7 @@ export async function fetchPedidosVendas(opts = {}) {
   const params = new URLSearchParams({
     dataInicial: opts.dataInicial ?? today,
     dataFinal:   opts.dataFinal   ?? today,
-    limite:      String(opts.limite ?? 10000),
+    limite:      String(opts.limite ?? 100000),
   });
  
   const json = await blingFetch(`/pedidos/vendas?${params}`);

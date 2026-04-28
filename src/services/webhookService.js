@@ -4,6 +4,7 @@ import * as clienteRepo from '../repository/clienteRepository.js';
 import * as vendaRepo from '../repository/vendaRepository.js';
 import { fetchPedidoById, fetchContatoById } from './routine/blingApi.js';
 import logger from '../config/logger.js';
+import chalk from 'chalk';
 
 export async function processarWebhookVenda(body) {
   const { data } = body;
@@ -14,7 +15,7 @@ export async function processarWebhookVenda(body) {
   }
 
   if (data.situacao && data.situacao.valor !== 1) {
-    logger.info('Webhook ignorado: situação não confirmada');
+    logger.info(chalk.bgGray('Webhook ignorado: situação não confirmada'));
     return;
   }
 
@@ -22,7 +23,7 @@ export async function processarWebhookVenda(body) {
 
   
     if (pedido.contato.id === 15590339554) {
-      logger.info('Webhook ignorado: Consumidor final sem registro');
+      logger.info(chalk.bgGray.black('Webhook ignorado: Consumidor final sem registro'));
       return;
     }
   if (pedido.situacao?.valor !== 1) {
@@ -37,9 +38,9 @@ export async function processarWebhookVenda(body) {
 
   const doc = contato.numeroDocumento?.replace(/\D/g, '');
   if (!doc || !cpfValidator.isValid(doc)) {
-    logger.info('Webhook ignorado: CPF inválido ou ausente', {
+    logger.info(chalk.bgYellow('Webhook ignorado: CPF inválido ou ausente', {
       contatoId: contato.id,
-    });
+    }));
     return;
   }
 

@@ -1,3 +1,5 @@
+import chalk from "chalk";
+
 const isDev = process.env.NODE_ENV !== 'production';
 
 function formatMessage(level, message, meta) {
@@ -12,7 +14,7 @@ function formatMessage(level, message, meta) {
 const logger = {
   info: (msg, meta = {}) => console.info(formatMessage('info', msg, meta)),
   warn: (msg, meta = {}) => console.warn(formatMessage('warn', msg, meta)),
-  error: (msg, meta = {}) => console.error(formatMessage('error', msg, meta)),
+  error: (msg, meta = {}) => console.error(chalk.bgRed(formatMessage('error', msg, meta))),
   debug: (msg, meta = {}) => {
     if (isDev) console.debug(formatMessage('debug', msg, meta));
   },

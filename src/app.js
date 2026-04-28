@@ -40,6 +40,8 @@ app.use('/api/v1', clienteRoutes);
 app.use('/api/v1', resgateRoutes);
 app.use('/api/v1', authRoutes);
 app.use('/api/v1', webhookRoutes);
+// rota para retry do bling
+app.use('/webhooks', webhookRoutes);
 
 // ── check bling signature ────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -69,7 +71,7 @@ const server = app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`, { env: process.env.NODE_ENV ?? 'development' });
 });
 
-// ── Cron: rotina diária de sincronização (23:59) ─────────────────────────────
+// ── Cron: rotina diária de sincronização (23:55) ─────────────────────────────
 cron.schedule('55 23 * * *', async () => {
   logger.info('Cron: iniciando rotina diaria de sincronizacao');
   try {
