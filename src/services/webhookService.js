@@ -38,9 +38,9 @@ export async function processarWebhookVenda(body) {
 
   const doc = contato.numeroDocumento?.replace(/\D/g, '');
   if (!doc || !cpfValidator.isValid(doc)) {
-    logger.info(chalk.bgYellow('Webhook ignorado: CPF inválido ou ausente', {
+    logger.info('Webhook ignorado: CPF inválido ou ausente', {
       contatoId: contato.id,
-    }));
+    });
     return;
   }
 
