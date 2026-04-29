@@ -1,0 +1,45 @@
+### ===========================================================================
+### Testes do fluxo OAuth Shopify — Fidelian (Diboa)
+### Usar com extensão REST Client do VS Code ou similar
+### ===========================================================================
+
+### ---------------------------------------------------------------------------
+### 1. INICIAR FLUXO OAuth
+### Abra esta URL no NAVEGADOR (não execute aqui — precisa do redirect).
+### Substitua pelo seu domínio do ngrok e da loja.
+### ---------------------------------------------------------------------------
+# Abrir no navegador:
+# https://SEU-TUNEL.ngrok-free.dev/api/v1/auth/shopify?shop=diboatabacaria.myshopify.com
+
+### ---------------------------------------------------------------------------
+### 2. VERIFICAR STATUS DA INSTALAÇÃO
+### Após completar o OAuth, este endpoint confirma que o token foi salvo.
+### ---------------------------------------------------------------------------
+GET http://localhost:9595/api/v1/auth/shopify/status?shop=diboatabacaria.myshopify.com
+Content-Type: application/json
+
+### ---------------------------------------------------------------------------
+### 3. HEALTH CHECK
+### ---------------------------------------------------------------------------
+GET http://localhost:9595/health
+
+### ---------------------------------------------------------------------------
+### NOTAS IMPORTANTES:
+###
+### O fluxo OAuth completo acontece no navegador:
+###
+### Passo 1: Abra a URL do passo 1 no navegador
+### Passo 2: O Shopify mostra a tela de permissões
+### Passo 3: Você clica "Instalar app"
+### Passo 4: O Shopify redireciona para /api/v1/auth/shopify/callback
+### Passo 5: Sua API troca o code por token e salva no MySQL
+### Passo 6: Você vê a resposta JSON de sucesso
+###
+### CONFIGURAÇÃO DO NGROK:
+### Terminal 1: npm run dev  (API rodando na porta 9595)
+### Terminal 2: ngrok http 9595
+###
+### CONFIGURAÇÃO DO DEV DASHBOARD:
+### - App URL: https://SEU-TUNEL.ngrok-free.dev/api/v1/auth/shopify
+### - Allowed redirect URL: https://SEU-TUNEL.ngrok-free.dev/api/v1/auth/shopify/callback
+### ===========================================================================

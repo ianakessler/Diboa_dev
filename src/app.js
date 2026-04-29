@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
 import clienteRoutes from './routes/clienteRoutes.js';
 import resgateRoutes from './routes/resgateRoutes.js';
+import fidelidadeRoutes from './routes/fidelidadeRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -26,7 +27,22 @@ app.use(express.json({
     }
   },
 }));
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+
+// CORS restrito ao domínio da loja (ajustar conforme necessidade)
+const allowedOrigins = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    // Permitir requests sem origin (Postman, server-to-server, webhooks)
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Bloqueado pelo CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  credentials: true,
+}));
+
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -38,6 +54,7 @@ app.use(rateLimit({
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 app.use('/api/v1', clienteRoutes);
 app.use('/api/v1', resgateRoutes);
+app.use('/api/v1', fidelidadeRoutes);
 app.use('/api/v1', authRoutes);
 app.use('/api/v1', webhookRoutes);
 // rota para retry do bling
@@ -71,7 +88,7 @@ const server = app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`, { env: process.env.NODE_ENV ?? 'development' });
 });
 
-// ── Cron: rotina diária de sincronização (23:55) ─────────────────────────────
+// ── Cron: rotina diária de sincronização Bling (23:55) ───────────────────────
 cron.schedule('55 23 * * *', async () => {
   logger.info('Cron: iniciando rotina diaria de sincronizacao');
   try {
@@ -79,6 +96,37 @@ cron.schedule('55 23 * * *', async () => {
     logger.info('Cron: rotina concluida', result);
   } catch (err) {
     logger.error('Cron: erro na rotina', { error: err.message });
+  }
+});
+
+// ── Cron: expirar cupons vencidos (01:00) ────────────────────────────────────
+cron.schedule('0 1 * * *', async () => {
+  logger.info('Cron: verificando cupons expirados');
+  try {
+    const cupomRepo = await import('./repository/cupomRepository.js');
+    const expirados = await cupomRepo.findExpirados();
+
+    if (expirados.length === 0) {
+      logger.info('Cron: nenhum cupom expirado');
+      return;
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      for (const cupom of expirados) {
+        await cupomRepo.marcarComoExpirado(conn, cupom.id);
+      }
+      await conn.commit();
+      logger.info('Cron: cupons expirados marcados', { total: expirados.length });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    logger.error('Cron: erro ao expirar cupons', { error: err.message });
   }
 });
 
