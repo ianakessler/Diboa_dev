@@ -1,4 +1,4 @@
-import { getAuthorizationUrl, exchangeCodeForTokens } from '../services/routine/blingAuth.js';
+import { getAuthorizationUrl, exchangeCodeForTokens } from '../services/integrations/bling/blingAuth.js';
 
 export async function authBling(req, res) {
   const redirectUri = process.env.BLING_REDIRECT_URI;

@@ -12,7 +12,9 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import logger from './config/logger.js';
 import pool from './config/db.js';
-import { executarRotina } from './services/routine/syncRoutine.js';
+// v2: rotina de sync desativada (acúmulo agora entra por webhook). syncRoutine.js
+// é outro workstream — mantido no repo, mas não importado no boot.
+// import { executarRotina } from './services/routine/syncRoutine.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -89,15 +91,16 @@ const server = app.listen(PORT, () => {
 });
 
 // ── Cron: rotina diária de sincronização Bling (23:55) ───────────────────────
-cron.schedule('55 23 * * *', async () => {
-  logger.info('Cron: iniciando rotina diaria de sincronizacao');
-  try {
-    const result = await executarRotina();
-    logger.info('Cron: rotina concluida', result);
-  } catch (err) {
-    logger.error('Cron: erro na rotina', { error: err.message });
-  }
-});
+// v2: desativada — o acúmulo de pontos passa a entrar por webhook (sem pull diário).
+// cron.schedule('55 23 * * *', async () => {
+//   logger.info('Cron: iniciando rotina diaria de sincronizacao');
+//   try {
+//     const result = await executarRotina();
+//     logger.info('Cron: rotina concluida', result);
+//   } catch (err) {
+//     logger.error('Cron: erro na rotina', { error: err.message });
+//   }
+// });
 
 // ── Cron: expirar cupons vencidos (01:00) ────────────────────────────────────
 cron.schedule('0 1 * * *', async () => {

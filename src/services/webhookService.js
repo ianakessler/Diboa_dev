@@ -2,18 +2,20 @@ import { cpf as cpfValidator } from 'cpf-cnpj-validator';
 import pool from '../config/db.js';
 import * as clienteRepo from '../repository/clienteRepository.js';
 import * as vendaRepo from '../repository/vendaRepository.js';
-import { fetchPedidoById, fetchContatoById } from './routine/blingApi.js';
+import { fetchPedidoById, fetchContatoById } from './integrations/bling/blingApi.js';
 import logger from '../config/logger.js';
 import chalk from 'chalk';
 
 export async function processarWebhookVenda(body) {
   const { data } = body;
 
+
   if (!data?.id) {
     logger.warn('Webhook ignorado: payload sem data.id', { body });
     return;
   }
 
+  console.log(data);
   if (data.situacao && data.situacao.valor !== 1) {
     logger.info(chalk.bgGray('Webhook ignorado: situação não confirmada'));
     return;
@@ -27,10 +29,7 @@ export async function processarWebhookVenda(body) {
       return;
     }
   if (pedido.situacao?.valor !== 1) {
-    logger.info('Webhook ignorado após consulta: situação não confirmada', {
-      pedidoId: pedido.id,
-      situacao: pedido.situacao,
-    });
+    logger.info('Webhook ignorado após consulta: situação não confirmada');
     return;
   }
 
