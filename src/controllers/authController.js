@@ -24,8 +24,8 @@ export async function authBlingCallback(req, res, next) {
 
 export async function getValidToken(req, res, next) {
   try {
-    const accessToken = await getValidAccessToken();
-    res.status(200).json({ accessToken });
+    const { accessToken, expiresAt } = await getValidAccessToken();
+    res.status(200).json({ accessToken, expiresAt });
   } catch (error) {
     next(error);
   }

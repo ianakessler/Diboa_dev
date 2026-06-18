@@ -96,6 +96,7 @@ async function refreshAccessToken(currentRefreshToken) {
   });
 
   const data = await requestToken(body);
+  const expiresAt = Date.now() + data.expires_in * 1000;
   await saveTokensToDB({
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
@@ -103,13 +104,16 @@ async function refreshAccessToken(currentRefreshToken) {
   });
 
   logger.info('Bling: access_token renovado com sucesso');
-  return data.access_token;
+  return { accessToken: data.access_token, expiresAt };
 }
 
 /**
  * Retorna um access_token válido, renovando-o se estiver expirado (ou prestes
  * a expirar). Passe { forceRefresh: true } para forçar a renovação — usado
  * pelo retry de 401 no blingApi.
+ *
+ * @returns {Promise<{ accessToken: string, expiresAt: string }>} token válido e
+ *   o horário de expiração em UTC (ISO 8601).
  */
 export async function getValidAccessToken({ forceRefresh = false } = {}) {
   const record = await loadTokensFromDB();
@@ -124,9 +128,15 @@ export async function getValidAccessToken({ forceRefresh = false } = {}) {
 
   const isExpired = Date.now() >= Number(record.expires_at) - EXPIRY_MARGIN_MS;
 
-  if (!forceRefresh && !isExpired) return record.access_token;
+  if (!forceRefresh && !isExpired) {
+    return {
+      accessToken: record.access_token,
+      expiresAt: new Date(Number(record.expires_at)).toISOString(),
+    };
+  }
 
-  return refreshAccessToken(record.refresh_token);
+  const { accessToken, expiresAt } = await refreshAccessToken(record.refresh_token);
+  return { accessToken, expiresAt: new Date(expiresAt).toISOString() };
 }
 
 export function getAuthorizationUrl(redirectUri, state) {

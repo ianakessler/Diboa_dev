@@ -19,7 +19,7 @@ function onlyDigits(value) {
  * a chamada uma única vez.
  */
 export async function blingFetch(path, options = {}, { _retry = false } = {}) {
-  const token = await getValidAccessToken({ forceRefresh: _retry });
+  const { accessToken: token } = await getValidAccessToken({ forceRefresh: _retry });
 
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
