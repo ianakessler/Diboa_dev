@@ -1,4 +1,8 @@
-import { getAuthorizationUrl, exchangeCodeForTokens } from '../services/integrations/bling/blingAuth.js';
+import {
+  getAuthorizationUrl,
+  exchangeCodeForTokens,
+  getValidAccessToken,
+} from '../services/integrations/bling/blingAuth.js';
 
 export async function authBling(req, res) {
   const redirectUri = process.env.BLING_REDIRECT_URI;
@@ -13,6 +17,15 @@ export async function authBlingCallback(req, res, next) {
     const redirectUri = process.env.BLING_REDIRECT_URI;
     await exchangeCodeForTokens(code, redirectUri);
     res.status(200).json({ message: 'Tokens salvos com sucesso' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getValidToken(req, res, next) {
+  try {
+    const accessToken = await getValidAccessToken();
+    res.status(200).json({ accessToken });
   } catch (error) {
     next(error);
   }
